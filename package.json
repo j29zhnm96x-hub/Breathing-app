@@ -1,0 +1,23 @@
+{
+  "name": "breathing-app",
+  "version": "1.0.0",
+  "description": "A modern breathing exercise app with customizable routines and guided sessions",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve .",
+    "dev": "live-server ."
+  },
+  "keywords": [
+    "breathing",
+    "meditation",
+    "wellness",
+    "wim-hof",
+    "breathing-exercises"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1",
+    "live-server": "^1.2.2"
+  }
+}

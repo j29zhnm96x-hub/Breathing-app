@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Breathe - Breathing Exercise App</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i data-lucide="wind"></i>
+                </div>
+                <span class="logo-text">Breathe</span>
+            </div>
+            <div class="header-controls">
+                <div class="dropdown-container">
+                    <button class="icon-button" id="exerciseDropdown">
+                        <i data-lucide="list"></i>
+                    </button>
+                    <div class="dropdown-menu" id="exerciseMenu">
+                        <div class="dropdown-item" data-exercise="default">Default Exercise</div>
+                        <div class="dropdown-divider"></div>
+                        <div id="customExercises"></div>
+                    </div>
+                </div>
+                <button class="icon-button" id="settingsBtn">
+                    <i data-lucide="settings"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="ready-text">Ready to breathe?</div>
+            
+            <!-- Main Breathing Button -->
+            <div class="breathing-button-container">
+                <button class="breathing-button" id="breathingBtn">
+                    <span class="button-text" id="buttonText">Ready</span>
+                </button>
+            </div>
+
+            <!-- Start/Pause Button -->
+            <button class="start-button" id="startBtn">
+                <i data-lucide="play"></i>
+                <span>START</span>
+            </button>
+
+            <!-- Pause/Resume Button -->
+            <button class="pause-button" id="pauseBtn" style="display: none;">
+                <i data-lucide="pause"></i>
+                <span>PAUSE</span>
+            </button>
+
+            <!-- Cancel Button -->
+            <button class="cancel-button" id="cancelBtn" style="display: none;">
+                <i data-lucide="x"></i>
+                <span>CANCEL</span>
+            </button>
+
+            <!-- Exercise Info -->
+            <div class="exercise-info" id="exerciseInfo">
+                <span id="exerciseName">Default Exercise</span> · <span id="cycleCount">3×</span>
+            </div>
+        </main>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Settings</h2>
+                    <button class="close-button" id="closeSettings">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <div class="setting-group">
+                        <label for="speechVolume">Speech Volume</label>
+                        <input type="range" id="speechVolume" min="0" max="100" value="70" class="slider">
+                        <span class="volume-value" id="speechVolumeValue">70%</span>
+                    </div>
+                    <div class="setting-group">
+                        <label for="musicVolume">Music Volume</label>
+                        <input type="range" id="musicVolume" min="0" max="100" value="50" class="slider">
+                        <span class="volume-value" id="musicVolumeValue">50%</span>
+                    </div>
+                    <button class="create-exercise-btn" id="createExerciseBtn">
+                        <i data-lucide="plus"></i>
+                        Create New Exercise
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cancel Confirmation Modal -->
+        <div class="modal-overlay" id="cancelConfirmModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Cancel Exercise?</h2>
+                </div>
+                <div class="modal-content">
+                    <p style="color: #374151; margin-bottom: 24px; text-align: center;">
+                        Are you sure you want to cancel this exercise? Your progress will be lost.
+                    </p>
+                    <div style="display: flex; gap: 12px; justify-content: center;">
+                        <button class="confirm-cancel-btn" id="confirmCancelBtn">
+                            Yes, Cancel
+                        </button>
+                        <button class="keep-going-btn" id="keepGoingBtn">
+                            Keep Going
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Create Exercise Modal -->
+        <div class="modal-overlay" id="createExerciseModal">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2>Create New Exercise</h2>
+                    <button class="close-button" id="closeCreateExercise">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
+                <div class="modal-content">
+                    <form id="exerciseForm">
+                        <div class="form-group">
+                            <label for="exerciseName">Exercise Name</label>
+                            <input type="text" id="exerciseNameInput" placeholder="e.g., My Wim Hof" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="cycleCountInput">Number of Cycles (1-4)</label>
+                            <input type="number" id="cycleCountInput" min="1" max="4" value="3" required>
+                        </div>
+                        <div id="cycleInputs"></div>
+                        <button type="submit" class="save-button">Save Exercise</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
