@@ -196,6 +196,20 @@ body {
     z-index: 1;
 }
 
+/* Paused State Visual Cue */
+body.session-active.paused .breathing-button {
+    filter: grayscale(40%) brightness(0.9);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
+}
+body.session-active.paused .button-text::after {
+    content: ' (Paused)';
+    font-size: 14px;
+    font-weight: 400;
+    opacity: 0.8;
+    display: block;
+    margin-top: 4px;
+}
+
 /* Start Button */
 .start-button {
     display: flex;

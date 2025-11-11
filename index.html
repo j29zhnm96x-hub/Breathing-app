@@ -6,6 +6,14 @@
     <title>Breathe - Breathing Exercise App</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/lucide.min.css" rel="stylesheet">
+    <!-- Favicon & PWA / iOS Home Screen Support -->
+    <link rel="icon" type="image/png" sizes="192x192" href="IMG/favicon.png">
+    <link rel="apple-touch-icon" href="IMG/favicon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Breathe">
+    <meta name="theme-color" content="#1e3a8a">
+    <link rel="manifest" href="manifest.json">
 </head>
 <body>
     <div class="app-container">
@@ -13,14 +21,14 @@
         <header class="header">
             <div class="logo">
                 <div class="logo-icon">
-                    <i data-lucide="wind"></i>
+                    <i data-lucide="wind" aria-hidden="true"></i>
                 </div>
                 <span class="logo-text">Breathe</span>
             </div>
             <div class="header-controls">
                 <div class="dropdown-container">
-                    <button class="icon-button" id="exerciseDropdown">
-                        <i data-lucide="list"></i>
+                    <button class="icon-button" id="exerciseDropdown" aria-haspopup="true" aria-expanded="false" aria-label="Select exercise">
+                        <i data-lucide="list" aria-hidden="true"></i>
                     </button>
                     <div class="dropdown-menu" id="exerciseMenu">
                         <div class="dropdown-item" data-exercise="default">Default Exercise</div>
@@ -28,8 +36,8 @@
                         <div id="customExercises"></div>
                     </div>
                 </div>
-                <button class="icon-button" id="settingsBtn">
-                    <i data-lucide="settings"></i>
+                <button class="icon-button" id="settingsBtn" aria-haspopup="dialog" aria-label="Open settings">
+                    <i data-lucide="settings" aria-hidden="true"></i>
                 </button>
             </div>
         </header>
@@ -40,26 +48,26 @@
             
             <!-- Main Breathing Button -->
             <div class="breathing-button-container">
-                <button class="breathing-button" id="breathingBtn">
+                <button class="breathing-button" id="breathingBtn" aria-label="Breathing control button" aria-live="polite">
                     <span class="button-text" id="buttonText">Ready</span>
                 </button>
             </div>
 
             <!-- Start/Pause Button -->
-            <button class="start-button" id="startBtn">
-                <i data-lucide="play"></i>
+            <button class="start-button" id="startBtn" aria-label="Start session">
+                <i data-lucide="play" aria-hidden="true"></i>
                 <span>START</span>
             </button>
 
             <!-- Pause/Resume Button -->
-            <button class="pause-button" id="pauseBtn" style="display: none;">
-                <i data-lucide="pause"></i>
+            <button class="pause-button" id="pauseBtn" style="display: none;" aria-label="Pause session">
+                <i data-lucide="pause" aria-hidden="true"></i>
                 <span>PAUSE</span>
             </button>
 
             <!-- Cancel Button -->
-            <button class="cancel-button" id="cancelBtn" style="display: none;">
-                <i data-lucide="x"></i>
+            <button class="cancel-button" id="cancelBtn" style="display: none;" aria-label="Cancel session">
+                <i data-lucide="x" aria-hidden="true"></i>
                 <span>CANCEL</span>
             </button>
 
@@ -70,12 +78,12 @@
         </main>
 
         <!-- Settings Modal -->
-        <div class="modal-overlay" id="settingsModal">
+        <div class="modal-overlay" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>Settings</h2>
-                    <button class="close-button" id="closeSettings">
-                        <i data-lucide="x"></i>
+                    <h2 id="settingsTitle">Settings</h2>
+                    <button class="close-button" id="closeSettings" aria-label="Close settings">
+                        <i data-lucide="x" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div class="modal-content">
@@ -84,7 +92,7 @@
                         <input type="range" id="speechVolume" min="0" max="100" value="70" class="slider">
                         <span class="volume-value" id="speechVolumeValue">70%</span>
                     </div>
-                    <div class="setting-group">
+                    <div class="setting-group" id="musicSettingGroup">
                         <label for="musicVolume">Music Volume</label>
                         <input type="range" id="musicVolume" min="0" max="100" value="50" class="slider">
                         <span class="volume-value" id="musicVolumeValue">50%</span>
@@ -98,20 +106,20 @@
         </div>
 
         <!-- Cancel Confirmation Modal -->
-        <div class="modal-overlay" id="cancelConfirmModal">
+        <div class="modal-overlay" id="cancelConfirmModal" role="dialog" aria-modal="true" aria-labelledby="cancelTitle">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>Cancel Exercise?</h2>
+                    <h2 id="cancelTitle">Cancel Exercise?</h2>
                 </div>
                 <div class="modal-content">
                     <p style="color: #374151; margin-bottom: 24px; text-align: center;">
                         Are you sure you want to cancel this exercise? Your progress will be lost.
                     </p>
                     <div style="display: flex; gap: 12px; justify-content: center;">
-                        <button class="confirm-cancel-btn" id="confirmCancelBtn">
+                        <button class="confirm-cancel-btn" id="confirmCancelBtn" aria-label="Confirm cancel session">
                             Yes, Cancel
                         </button>
-                        <button class="keep-going-btn" id="keepGoingBtn">
+                        <button class="keep-going-btn" id="keepGoingBtn" aria-label="Keep session going">
                             Keep Going
                         </button>
                     </div>
@@ -120,12 +128,12 @@
         </div>
 
         <!-- Create Exercise Modal -->
-        <div class="modal-overlay" id="createExerciseModal">
+        <div class="modal-overlay" id="createExerciseModal" role="dialog" aria-modal="true" aria-labelledby="createExerciseTitle">
             <div class="modal">
                 <div class="modal-header">
-                    <h2>Create New Exercise</h2>
-                    <button class="close-button" id="closeCreateExercise">
-                        <i data-lucide="x"></i>
+                    <h2 id="createExerciseTitle">Create New Exercise</h2>
+                    <button class="close-button" id="closeCreateExercise" aria-label="Close create exercise">
+                        <i data-lucide="x" aria-hidden="true"></i>
                     </button>
                 </div>
                 <div class="modal-content">

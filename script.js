@@ -18,6 +18,8 @@ class BreathingApp {
         this.timer = null;
         this.timeRemaining = 0;
         this.isPaused = false;
+        this.lastFocusedElement = null;
+        this.keyDownActive = false; // prevent repeat on keydown
         
         this.settings = {
             speechVolume: 70,
@@ -25,6 +27,7 @@ class BreathingApp {
         };
         
         this.initializeElements();
+        this.loadSettings();
         this.bindEvents();
         this.loadCustomExercises();
         this.updateExerciseInfo();
@@ -48,6 +51,7 @@ class BreathingApp {
         this.exerciseDropdown = document.getElementById('exerciseDropdown');
         this.exerciseMenu = document.getElementById('exerciseMenu');
         this.customExercises = document.getElementById('customExercises');
+        this.dropdownContainer = document.querySelector('.dropdown-container');
         
         // Modal elements
         this.settingsBtn = document.getElementById('settingsBtn');
@@ -62,6 +66,7 @@ class BreathingApp {
         this.musicVolume = document.getElementById('musicVolume');
         this.speechVolumeValue = document.getElementById('speechVolumeValue');
         this.musicVolumeValue = document.getElementById('musicVolumeValue');
+        this.musicSettingGroup = document.getElementById('musicSettingGroup');
         
         // Form elements
         this.exerciseForm = document.getElementById('exerciseForm');
@@ -92,6 +97,24 @@ class BreathingApp {
             e.preventDefault();
             this.handleBreathEnd();
         });
+        // Keyboard support for breathing button
+        this.breathingBtn.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                if (e.repeat) return;
+                e.preventDefault();
+                if (!this.keyDownActive) {
+                    this.keyDownActive = true;
+                    this.handleBreathStart();
+                }
+            }
+        });
+        this.breathingBtn.addEventListener('keyup', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                this.keyDownActive = false;
+                this.handleBreathEnd();
+            }
+        });
         
         this.startBtn.addEventListener('click', () => this.startSession());
         this.pauseBtn.addEventListener('click', () => this.togglePause());
@@ -107,7 +130,7 @@ class BreathingApp {
         // Dropdown events
         this.exerciseDropdown.addEventListener('click', () => this.toggleDropdown());
         document.addEventListener('click', (e) => {
-            if (!this.exerciseDropdown.contains(e.target)) {
+            if (this.exerciseMenu.classList.contains('active') && !this.dropdownContainer.contains(e.target)) {
                 this.closeDropdown();
             }
         });
@@ -132,6 +155,15 @@ class BreathingApp {
         });
         this.createExerciseModal.addEventListener('click', (e) => {
             if (e.target === this.createExerciseModal) this.closeModal(this.createExerciseModal);
+        });
+
+        // Global ESC to close modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.createExerciseModal.classList.contains('active')) this.closeModal(this.createExerciseModal);
+                else if (this.settingsModal.classList.contains('active')) this.closeModal(this.settingsModal);
+                else if (this.cancelConfirmModal.classList.contains('active')) this.closeCancelConfirmation();
+            }
         });
     }
     
@@ -167,6 +199,7 @@ class BreathingApp {
         this.isPaused = false;
         
         document.body.classList.add('session-active');
+        document.body.classList.remove('paused');
         this.startBtn.style.display = 'none';
         this.pauseBtn.style.display = 'flex';
         this.cancelBtn.style.display = 'flex';
@@ -252,6 +285,7 @@ class BreathingApp {
         this.isPaused = false;
         
         document.body.classList.remove('session-active');
+        document.body.classList.remove('paused');
         this.buttonText.textContent = 'Ready';
         this.breathingBtn.classList.remove('pressed');
         this.startBtn.style.display = 'flex';
@@ -271,6 +305,7 @@ class BreathingApp {
             this.pauseBtn.querySelector('span').textContent = 'PAUSE';
             this.pauseBtn.querySelector('i').setAttribute('data-lucide', 'pause');
             lucide.createIcons();
+            document.body.classList.remove('paused');
             
             // Resume timer if in holding or recovery state
             if (this.sessionState === 'holding' || this.sessionState === 'recovery') {
@@ -282,6 +317,7 @@ class BreathingApp {
             this.pauseBtn.querySelector('span').textContent = 'RESUME';
             this.pauseBtn.querySelector('i').setAttribute('data-lucide', 'play');
             lucide.createIcons();
+            document.body.classList.add('paused');
             
             // Pause timer if running
             if (this.timer) {
@@ -356,13 +392,21 @@ class BreathingApp {
     
     toggleDropdown() {
         this.exerciseMenu.classList.toggle('active');
+        const expanded = this.exerciseMenu.classList.contains('active');
+        this.exerciseDropdown.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     }
     
     closeDropdown() {
         this.exerciseMenu.classList.remove('active');
+        this.exerciseDropdown.setAttribute('aria-expanded', 'false');
     }
     
     selectExercise(exerciseKey) {
+        if (this.sessionState !== 'ready') {
+            const proceed = window.confirm('Switching exercises will cancel your current session. Continue?');
+            if (!proceed) return;
+            this.resetSession();
+        }
         this.currentExercise = exerciseKey;
         this.updateExerciseInfo();
         this.closeDropdown();
@@ -375,17 +419,26 @@ class BreathingApp {
     }
     
     openSettings() {
+        this.lastFocusedElement = document.activeElement;
         this.settingsModal.classList.add('active');
+        // Focus the close button for accessibility
+        this.closeSettings.focus();
     }
     
     openCreateExercise() {
         this.closeModal(this.settingsModal);
+        this.lastFocusedElement = document.activeElement;
         this.createExerciseModal.classList.add('active');
         this.generateCycleInputs();
+        this.closeCreateExercise.focus();
     }
     
     closeModal(modal) {
         modal.classList.remove('active');
+        if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+            this.lastFocusedElement.focus();
+            this.lastFocusedElement = null;
+        }
     }
     
     updateVolume(type) {
@@ -396,6 +449,7 @@ class BreathingApp {
             this.settings.musicVolume = this.musicVolume.value;
             this.musicVolumeValue.textContent = `${this.musicVolume.value}%`;
         }
+        this.saveSettings();
     }
     
     generateCycleInputs() {
@@ -496,3 +550,34 @@ class BreathingApp {
 document.addEventListener('DOMContentLoaded', () => {
     new BreathingApp();
 });
+
+// Settings persistence helpers
+BreathingApp.prototype.saveSettings = function() {
+    try {
+        localStorage.setItem('breathingAppSettings', JSON.stringify(this.settings));
+    } catch (e) {}
+};
+
+BreathingApp.prototype.loadSettings = function() {
+    try {
+        const saved = localStorage.getItem('breathingAppSettings');
+        if (saved) {
+            const parsed = JSON.parse(saved);
+            if (typeof parsed.speechVolume === 'number') this.settings.speechVolume = parsed.speechVolume;
+            if (typeof parsed.musicVolume === 'number') this.settings.musicVolume = parsed.musicVolume;
+        }
+    } catch (e) {}
+    // Reflect settings in UI
+    if (this.speechVolume) {
+        this.speechVolume.value = this.settings.speechVolume;
+        this.speechVolumeValue.textContent = `${this.settings.speechVolume}%`;
+    }
+    if (this.musicVolume) {
+        this.musicVolume.value = this.settings.musicVolume;
+        this.musicVolumeValue.textContent = `${this.settings.musicVolume}%`;
+    }
+    // Hide music setting until background audio is implemented
+    if (this.musicSettingGroup) {
+        this.musicSettingGroup.style.display = 'none';
+    }
+};
