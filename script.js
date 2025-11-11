@@ -25,6 +25,7 @@ class BreathingApp {
             speechVolume: 70,
             musicVolume: 50
         };
+        this.editingExerciseKey = null;
         
         this.initializeElements();
         this.loadSettings();
@@ -78,6 +79,11 @@ class BreathingApp {
         this.cancelConfirmModal = document.getElementById('cancelConfirmModal');
         this.confirmCancelBtn = document.getElementById('confirmCancelBtn');
         this.keepGoingBtn = document.getElementById('keepGoingBtn');
+    // Delete confirmation modal elements
+    this.deleteConfirmModal = document.getElementById('deleteConfirmModal');
+    this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    this.cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    this.pendingDeleteKey = null;
         
         // Create timer display
         this.timerDisplay = document.createElement('div');
@@ -156,6 +162,20 @@ class BreathingApp {
         this.createExerciseModal.addEventListener('click', (e) => {
             if (e.target === this.createExerciseModal) this.closeModal(this.createExerciseModal);
         });
+
+        // update settings list when settings modal opens
+        this.settingsBtn.addEventListener('click', () => {
+            // slight delay so modal becomes active and element references exist
+            setTimeout(() => this.updateSettingsExerciseList(), 50);
+        });
+
+        // Delete confirm buttons
+        if (this.confirmDeleteBtn) this.confirmDeleteBtn.addEventListener('click', () => this.confirmDeleteExercise());
+        if (this.cancelDeleteBtn) this.cancelDeleteBtn.addEventListener('click', () => this.closeDeleteConfirmation());
+
+        // Rescan audio button
+        const rescanBtn = document.getElementById('rescanAudioBtn');
+        if (rescanBtn) rescanBtn.addEventListener('click', () => this.checkForAudioFiles());
 
         // Global ESC to close modals
         document.addEventListener('keydown', (e) => {
@@ -428,6 +448,7 @@ class BreathingApp {
     openCreateExercise() {
         this.closeModal(this.settingsModal);
         this.lastFocusedElement = document.activeElement;
+        this.editingExerciseKey = null; // new exercise by default
         this.createExerciseModal.classList.add('active');
         this.generateCycleInputs();
         this.closeCreateExercise.focus();
@@ -491,18 +512,46 @@ class BreathingApp {
             cycles.push({ breaths, holdTime });
         }
         
-        const exerciseKey = name.toLowerCase().replace(/\s+/g, '-');
-        this.exercises[exerciseKey] = { name, cycles };
-        
+        // slugify and ensure unique key
+        const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        let newKey = slugify(name);
+        if (!newKey) newKey = `exercise-${Date.now()}`;
+
+        // If editing an existing exercise
+        if (this.editingExerciseKey) {
+            // if name changed and key collides with another, ensure uniqueness
+            if (newKey !== this.editingExerciseKey && this.exercises[newKey]) {
+                let i = 1;
+                while (this.exercises[`${newKey}-${i}`]) i++;
+                newKey = `${newKey}-${i}`;
+            }
+            // delete old key if changed
+            if (newKey !== this.editingExerciseKey) {
+                delete this.exercises[this.editingExerciseKey];
+            }
+        } else {
+            // creating new - ensure unique
+            if (this.exercises[newKey]) {
+                let i = 1;
+                while (this.exercises[`${newKey}-${i}`]) i++;
+                newKey = `${newKey}-${i}`;
+            }
+        }
+
+        this.exercises[newKey] = { name, cycles };
+
         this.saveCustomExercises();
-        this.loadCustomExercises();
-        this.selectExercise(exerciseKey);
+        // update UI lists and dropdown
+        this.updateExerciseDropdown();
+        this.updateSettingsExerciseList();
+        this.selectExercise(newKey);
         this.closeModal(this.createExerciseModal);
-        
+
         // Reset form
         this.exerciseForm.reset();
         this.cycleCountInput.value = 3;
         this.generateCycleInputs();
+        this.editingExerciseKey = null;
     }
     
     saveCustomExercises() {
@@ -542,6 +591,220 @@ class BreathingApp {
         const defaultItem = this.exerciseMenu.querySelector('.dropdown-item[data-exercise="default"]');
         if (defaultItem) {
             defaultItem.addEventListener('click', () => this.selectExercise('default'));
+        }
+        // Also refresh settings list if visible
+        if (document.getElementById('customExerciseList')) this.updateSettingsExerciseList();
+    }
+
+    updateSettingsExerciseList() {
+        const container = document.getElementById('customExerciseList');
+        if (!container) return;
+        container.innerHTML = '';
+
+        const keys = Object.keys(this.exercises).filter(k => k !== 'default');
+        if (keys.length === 0) {
+            container.innerHTML = '<div style="color:#6b7280; font-size:13px">No custom exercises yet.</div>';
+            return;
+        }
+
+        keys.forEach(key => {
+            const ex = this.exercises[key];
+            const item = document.createElement('div');
+            item.className = 'settings-exercise-item';
+            item.style.display = 'flex';
+            item.style.justifyContent = 'space-between';
+            item.style.alignItems = 'center';
+            item.style.padding = '8px 10px';
+            item.style.borderRadius = '8px';
+            item.style.background = '#fff';
+            item.style.marginBottom = '8px';
+            item.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
+
+            const left = document.createElement('div');
+            left.style.display = 'flex';
+            left.style.flexDirection = 'column';
+            left.style.gap = '4px';
+            const title = document.createElement('div');
+            title.textContent = ex.name;
+            title.style.fontWeight = '600';
+            title.style.color = '#111827';
+            const meta = document.createElement('div');
+            meta.textContent = `${ex.cycles.length} cycles · ${ex.cycles.map(c=>c.breaths+'b/'+c.holdTime+'s').join(' · ')}`;
+            meta.style.fontSize = '12px';
+            meta.style.color = '#6b7280';
+            left.appendChild(title);
+            left.appendChild(meta);
+
+            const actions = document.createElement('div');
+            actions.style.display = 'flex';
+            actions.style.gap = '8px';
+
+            const editBtn = document.createElement('button');
+            editBtn.className = 'icon-button';
+            editBtn.style.padding = '6px';
+            editBtn.title = 'Edit';
+            editBtn.innerHTML = '<i data-lucide="edit" aria-hidden="true"></i>';
+            editBtn.addEventListener('click', () => this.openEditExercise(key));
+
+            const dupBtn = document.createElement('button');
+            dupBtn.className = 'icon-button';
+            dupBtn.style.padding = '6px';
+            dupBtn.title = 'Duplicate';
+            dupBtn.innerHTML = '<i data-lucide="copy" aria-hidden="true"></i>';
+            dupBtn.addEventListener('click', () => this.duplicateExercise(key));
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'icon-button';
+            delBtn.style.padding = '6px';
+            delBtn.title = 'Delete';
+            delBtn.innerHTML = '<i data-lucide="trash" aria-hidden="true"></i>';
+            delBtn.addEventListener('click', () => this.showDeleteConfirmation(key));
+
+            actions.appendChild(editBtn);
+            actions.appendChild(dupBtn);
+            actions.appendChild(delBtn);
+
+            item.appendChild(left);
+            item.appendChild(actions);
+
+            container.appendChild(item);
+        });
+
+        // re-render icons inside list
+        lucide.createIcons();
+    }
+
+    showDeleteConfirmation(key) {
+        this.pendingDeleteKey = key;
+        if (this.deleteConfirmModal) {
+            this.deleteConfirmModal.classList.add('active');
+            this.confirmDeleteBtn && this.confirmDeleteBtn.focus();
+        } else {
+            // fallback
+            this.deleteExercise(key);
+        }
+    }
+
+    closeDeleteConfirmation() {
+        if (this.deleteConfirmModal) this.deleteConfirmModal.classList.remove('active');
+        this.pendingDeleteKey = null;
+        if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+            this.lastFocusedElement.focus();
+            this.lastFocusedElement = null;
+        }
+    }
+
+    confirmDeleteExercise() {
+        if (!this.pendingDeleteKey) return this.closeDeleteConfirmation();
+        const key = this.pendingDeleteKey;
+        this.deleteExerciseNow(key);
+        this.closeDeleteConfirmation();
+    }
+
+    deleteExerciseNow(key) {
+        if (!this.exercises[key]) return;
+        delete this.exercises[key];
+        this.saveCustomExercises();
+        this.updateExerciseDropdown();
+        this.updateSettingsExerciseList();
+        if (this.currentExercise === key) this.selectExercise('default');
+    }
+
+    // replace previous deleteExercise which used confirm()
+    deleteExercise(key) {
+        // Deprecated - kept for compatibility. Use showDeleteConfirmation instead.
+        this.showDeleteConfirmation(key);
+    }
+
+    // Attempt to detect audio files in the Audio/ folder. If found, enable music controls.
+    async checkForAudioFiles() {
+        // candidate filenames to try
+        const candidates = [
+            'Audio/ambient.mp3',
+            'Audio/ambient.ogg',
+            'Audio/music.mp3',
+            'Audio/music.ogg'
+        ];
+        let found = false;
+        for (const path of candidates) {
+            try {
+                const resp = await fetch(path, { method: 'HEAD' });
+                if (resp && resp.ok) {
+                    found = true;
+                    break;
+                }
+            } catch (e) {
+                // try full GET as some servers don't allow HEAD
+                try {
+                    const r2 = await fetch(path);
+                    if (r2 && r2.ok) { found = true; break; }
+                } catch (err) {}
+            }
+        }
+
+        if (found) {
+            if (this.musicSettingGroup) this.musicSettingGroup.style.display = '';
+            const helper = document.getElementById('musicHelper');
+            if (helper) helper.textContent = 'Audio files detected — music control enabled.';
+            // ensure UI matches stored setting
+            this.musicVolume && (this.musicVolume.disabled = false);
+        } else {
+            if (this.musicSettingGroup) this.musicSettingGroup.style.display = '';
+            const helper = document.getElementById('musicHelper');
+            if (helper) helper.textContent = 'No audio files detected. Add files to the Audio/ folder and press Rescan.';
+            this.musicVolume && (this.musicVolume.disabled = true);
+        }
+    }
+
+    openEditExercise(key) {
+        const ex = this.exercises[key];
+        if (!ex) return;
+        this.editingExerciseKey = key;
+        // Close settings and open create modal prefilled
+        this.closeModal(this.settingsModal);
+        this.createExerciseModal.classList.add('active');
+        this.exerciseNameInput.value = ex.name;
+        this.cycleCountInput.value = ex.cycles.length;
+        this.generateCycleInputs();
+        // fill cycles
+        ex.cycles.forEach((c, i) => {
+            const breathsInput = document.querySelector(`input[name="breaths-${i}"]`);
+            const holdInput = document.querySelector(`input[name="hold-${i}"]`);
+            if (breathsInput) breathsInput.value = c.breaths;
+            if (holdInput) holdInput.value = c.holdTime;
+        });
+        this.closeCreateExercise.focus();
+    }
+
+    duplicateExercise(key) {
+        const ex = this.exercises[key];
+        if (!ex) return;
+        const baseName = `${ex.name} (copy)`;
+        const slugify = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        let newKey = slugify(baseName);
+        if (!newKey) newKey = `exercise-${Date.now()}`;
+        if (this.exercises[newKey]) {
+            let i = 1;
+            while (this.exercises[`${newKey}-${i}`]) i++;
+            newKey = `${newKey}-${i}`;
+        }
+        this.exercises[newKey] = { name: baseName, cycles: JSON.parse(JSON.stringify(ex.cycles)) };
+        this.saveCustomExercises();
+        this.updateExerciseDropdown();
+        this.updateSettingsExerciseList();
+    }
+
+    deleteExercise(key) {
+        if (!this.exercises[key]) return;
+        const confirmDel = window.confirm(`Delete "${this.exercises[key].name}"? This cannot be undone.`);
+        if (!confirmDel) return;
+        delete this.exercises[key];
+        this.saveCustomExercises();
+        this.updateExerciseDropdown();
+        this.updateSettingsExerciseList();
+        // if currently selected exercise was deleted, fall back to default
+        if (this.currentExercise === key) {
+            this.selectExercise('default');
         }
     }
 }

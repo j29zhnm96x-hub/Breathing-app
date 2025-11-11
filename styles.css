@@ -443,6 +443,34 @@ body.session-active.paused .button-text::after {
     transform: translateY(-1px);
 }
 
+.settings-exercise-list h3 {
+    margin: 0 0 8px 0;
+}
+
+.custom-exercises .settings-exercise-item .icon-button {
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: rgba(243,244,246,1);
+    color: #374151;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.custom-exercises .settings-exercise-item .icon-button:hover {
+    background: rgba(241,243,245,1);
+    transform: translateY(-1px);
+}
+
+/* Modal tweaks for delete dialog */
+.modal .confirm-cancel-btn {
+    background: #ef4444;
+}
+.modal .keep-going-btn {
+    background: #10b981;
+}
+
 /* Form Styles */
 .form-group {
     margin-bottom: 20px;
