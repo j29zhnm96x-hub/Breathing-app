@@ -26,6 +26,12 @@ class BreathingApp {
             musicVolume: 50
         };
         this.editingExerciseKey = null;
+        // Audio cue management
+        this.audio = {
+            cues: {},
+            files: {}
+        };
+        this.initAudio();
         
         this.initializeElements();
         this.loadSettings();
@@ -33,8 +39,10 @@ class BreathingApp {
         this.loadCustomExercises();
         this.updateExerciseInfo();
         
-        // Initialize Lucide icons
-        lucide.createIcons();
+    // Initialize Lucide icons
+    lucide.createIcons();
+    // Try to detect audio files on load to enable music UI
+    setTimeout(() => this.checkForAudioFiles(), 0);
     }
     
     initializeElements() {
@@ -185,6 +193,14 @@ class BreathingApp {
                 else if (this.cancelConfirmModal.classList.contains('active')) this.closeCancelConfirmation();
             }
         });
+
+        // Auto-select text/number inputs on focus for quicker editing
+        document.addEventListener('focusin', (e) => {
+            const el = e.target;
+            if (el && (el.matches('input[type="text"]') || el.matches('input[type="number"]') || el.matches('textarea'))) {
+                try { el.select(); } catch (_) {}
+            }
+        });
     }
     
     handleBreathStart() {
@@ -192,6 +208,12 @@ class BreathingApp {
         
         this.breathingBtn.classList.add('pressed');
         this.buttonText.textContent = 'Inhale';
+
+        // If this is the last inhale of the cycle, play the special cue
+        const currentCycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        if (this.currentBreath === currentCycleData.breaths - 1) {
+            this.playCue('last_breath_now_hold');
+        }
     }
     
     handleBreathEnd() {
@@ -206,7 +228,6 @@ class BreathingApp {
         if (this.currentBreath >= currentCycleData.breaths) {
             // Last breath of cycle
             setTimeout(() => {
-                this.speak("That's the last exhale... and hold");
                 this.startHoldPhase();
             }, 500);
         }
@@ -225,6 +246,7 @@ class BreathingApp {
         this.cancelBtn.style.display = 'flex';
         
         this.buttonText.textContent = 'Ready - press and hold to inhale';
+        this.playCue('start_session');
         
         setTimeout(() => {
             this.buttonText.textContent = 'Ready';
@@ -253,7 +275,9 @@ class BreathingApp {
     
     startRecoveryPhase() {
         this.sessionState = 'recovery';
-        this.speak('Breathe in and hold');
+        if (!this.playCue('recovery_breathe_in_hold')) {
+            this.speak('Breathe in and hold');
+        }
         this.timeRemaining = 10;
         
         this.buttonText.textContent = 'Recovery Breath';
@@ -279,8 +303,8 @@ class BreathingApp {
             return;
         }
         
-        this.timerDisplay.classList.remove('visible');
-        this.speak('Next cycle - three, two, one...');
+    this.timerDisplay.classList.remove('visible');
+    this.playCue('next_cycle');
         
         setTimeout(() => {
             this.sessionState = 'breathing';
@@ -291,7 +315,9 @@ class BreathingApp {
     finishSession() {
         this.sessionState = 'finished';
         this.timerDisplay.classList.remove('visible');
-        this.speak('Session finished - well done');
+        if (!this.playCue('session_finished')) {
+            this.speak('Session finished - well done');
+        }
         
         setTimeout(() => {
             this.resetSession();
@@ -443,6 +469,9 @@ class BreathingApp {
         this.settingsModal.classList.add('active');
         // Focus the close button for accessibility
         this.closeSettings.focus();
+        // Update lists and audio helper when opening
+        this.updateSettingsExerciseList();
+        this.checkForAudioFiles();
     }
     
     openCreateExercise() {
@@ -469,6 +498,10 @@ class BreathingApp {
         } else {
             this.settings.musicVolume = this.musicVolume.value;
             this.musicVolumeValue.textContent = `${this.musicVolume.value}%`;
+            // apply to any loaded audio cues
+            if (this.audio && this.audio.cues) {
+                Object.values(this.audio.cues).forEach(a => { try { a.volume = this.settings.musicVolume / 100; } catch(_){} });
+            }
         }
         this.saveSettings();
     }
@@ -795,17 +828,8 @@ class BreathingApp {
     }
 
     deleteExercise(key) {
-        if (!this.exercises[key]) return;
-        const confirmDel = window.confirm(`Delete "${this.exercises[key].name}"? This cannot be undone.`);
-        if (!confirmDel) return;
-        delete this.exercises[key];
-        this.saveCustomExercises();
-        this.updateExerciseDropdown();
-        this.updateSettingsExerciseList();
-        // if currently selected exercise was deleted, fall back to default
-        if (this.currentExercise === key) {
-            this.selectExercise('default');
-        }
+        // Use the in-app confirmation modal
+        this.showDeleteConfirmation(key);
     }
 }
 
@@ -839,8 +863,50 @@ BreathingApp.prototype.loadSettings = function() {
         this.musicVolume.value = this.settings.musicVolume;
         this.musicVolumeValue.textContent = `${this.settings.musicVolume}%`;
     }
-    // Hide music setting until background audio is implemented
+    // Show music setting but keep disabled until audio files are detected
     if (this.musicSettingGroup) {
-        this.musicSettingGroup.style.display = 'none';
+        this.musicSettingGroup.style.display = '';
+        if (this.musicVolume) this.musicVolume.disabled = true;
+    }
+};
+
+// Audio helpers
+BreathingApp.prototype.initAudio = function() {
+    this.audio.files = {
+        // Provided by user
+        last_breath_now_hold: 'Audio/last-breathe_now-hold.mp3',
+        // Optional cues (will play only if files exist)
+        start_session: 'Audio/start.mp3',
+        next_cycle: 'Audio/next-cycle.mp3',
+        start_hold: 'Audio/hold.mp3',
+        recovery_breathe_in_hold: 'Audio/recovery-breathe-in-hold.mp3',
+        session_finished: 'Audio/session-finished.mp3'
+    };
+};
+
+BreathingApp.prototype.playCue = function(key) {
+    const src = this.audio.files[key];
+    if (!src) return false;
+    if (!this.audio.cues[key]) {
+        try {
+            const a = new Audio(src);
+            a.preload = 'auto';
+            a.volume = this.settings.musicVolume / 100;
+            this.audio.cues[key] = a;
+        } catch (e) {
+            return false;
+        }
+    }
+    const audio = this.audio.cues[key];
+    try {
+        audio.currentTime = 0;
+        audio.volume = this.settings.musicVolume / 100;
+        const p = audio.play();
+        if (p && typeof p.then === 'function') {
+            p.catch(() => {});
+        }
+        return true;
+    } catch (e) {
+        return false;
     }
 };
