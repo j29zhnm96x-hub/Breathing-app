@@ -632,3 +632,53 @@ body.session-active.paused .button-text::after {
         grid-template-columns: 1fr;
     }
 }
+
+/* Settings Exercise List Items */
+.settings-exercise-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #fff;
+    margin-bottom: 8px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+
+.settings-exercise-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.settings-exercise-title {
+    font-weight: 600;
+    color: #111827;
+}
+
+.settings-exercise-meta {
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.settings-exercise-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.settings-exercise-actions .icon-button {
+    padding: 6px;
+    width: 36px;
+    height: 36px;
+    border-radius: 6px;
+    background: rgba(243,244,246,1);
+    color: #374151;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.settings-exercise-actions .icon-button:hover {
+    background: rgba(241,243,245,1);
+    transform: translateY(-1px);
+}

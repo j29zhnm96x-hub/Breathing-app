@@ -23,7 +23,7 @@ class BreathingApp {
         
         this.settings = {
             speechVolume: 70,
-            musicVolume: 50
+            soundVolume: 50
         };
         this.editingExerciseKey = null;
         // Audio cue management
@@ -72,9 +72,9 @@ class BreathingApp {
         
         // Settings elements
         this.speechVolume = document.getElementById('speechVolume');
-        this.musicVolume = document.getElementById('musicVolume');
+        this.soundVolume = document.getElementById('soundVolume');
         this.speechVolumeValue = document.getElementById('speechVolumeValue');
-        this.musicVolumeValue = document.getElementById('musicVolumeValue');
+        this.soundVolumeValue = document.getElementById('soundVolumeValue');
         this.musicSettingGroup = document.getElementById('musicSettingGroup');
         
         // Form elements
@@ -157,7 +157,7 @@ class BreathingApp {
         
         // Settings events
         this.speechVolume.addEventListener('input', () => this.updateVolume('speech'));
-        this.musicVolume.addEventListener('input', () => this.updateVolume('music'));
+        this.soundVolume.addEventListener('input', () => this.updateVolume('sound'));
         
         // Form events
         this.cycleCountInput.addEventListener('input', () => this.generateCycleInputs());
@@ -262,15 +262,21 @@ class BreathingApp {
         this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
         this.timerDisplay.classList.add('visible');
         
+        const startTime = Date.now();
+        const totalTime = this.timeRemaining;
+
         this.timer = setInterval(() => {
-            this.timeRemaining--;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            this.timeRemaining = totalTime - elapsed;
+            
+            if (this.timeRemaining < 0) this.timeRemaining = 0;
             this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
             
             if (this.timeRemaining <= 0) {
                 clearInterval(this.timer);
                 this.startRecoveryPhase();
             }
-        }, 1000);
+        }, 100);
     }
     
     startRecoveryPhase() {
@@ -283,15 +289,21 @@ class BreathingApp {
         this.buttonText.textContent = 'Recovery Breath';
         this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
         
+        const startTime = Date.now();
+        const totalTime = this.timeRemaining;
+
         this.timer = setInterval(() => {
-            this.timeRemaining--;
+            const elapsed = Math.floor((Date.now() - startTime) / 1000);
+            this.timeRemaining = totalTime - elapsed;
+            
+            if (this.timeRemaining < 0) this.timeRemaining = 0;
             this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
             
             if (this.timeRemaining <= 0) {
                 clearInterval(this.timer);
                 this.nextCycle();
             }
-        }, 1000);
+        }, 100);
     }
     
     nextCycle() {
@@ -496,11 +508,11 @@ class BreathingApp {
             this.settings.speechVolume = this.speechVolume.value;
             this.speechVolumeValue.textContent = `${this.speechVolume.value}%`;
         } else {
-            this.settings.musicVolume = this.musicVolume.value;
-            this.musicVolumeValue.textContent = `${this.musicVolume.value}%`;
+            this.settings.soundVolume = this.soundVolume.value;
+            this.soundVolumeValue.textContent = `${this.soundVolume.value}%`;
             // apply to any loaded audio cues
             if (this.audio && this.audio.cues) {
-                Object.values(this.audio.cues).forEach(a => { try { a.volume = this.settings.musicVolume / 100; } catch(_){} });
+                Object.values(this.audio.cues).forEach(a => { try { a.volume = this.settings.soundVolume / 100; } catch(_){} });
             }
         }
         this.saveSettings();
@@ -644,51 +656,38 @@ class BreathingApp {
             const ex = this.exercises[key];
             const item = document.createElement('div');
             item.className = 'settings-exercise-item';
-            item.style.display = 'flex';
-            item.style.justifyContent = 'space-between';
-            item.style.alignItems = 'center';
-            item.style.padding = '8px 10px';
-            item.style.borderRadius = '8px';
-            item.style.background = '#fff';
-            item.style.marginBottom = '8px';
-            item.style.boxShadow = '0 1px 2px rgba(0,0,0,0.04)';
 
             const left = document.createElement('div');
-            left.style.display = 'flex';
-            left.style.flexDirection = 'column';
-            left.style.gap = '4px';
+            left.className = 'settings-exercise-info';
+            
             const title = document.createElement('div');
+            title.className = 'settings-exercise-title';
             title.textContent = ex.name;
-            title.style.fontWeight = '600';
-            title.style.color = '#111827';
+            
             const meta = document.createElement('div');
+            meta.className = 'settings-exercise-meta';
             meta.textContent = `${ex.cycles.length} cycles · ${ex.cycles.map(c=>c.breaths+'b/'+c.holdTime+'s').join(' · ')}`;
-            meta.style.fontSize = '12px';
-            meta.style.color = '#6b7280';
+            
             left.appendChild(title);
             left.appendChild(meta);
 
             const actions = document.createElement('div');
-            actions.style.display = 'flex';
-            actions.style.gap = '8px';
+            actions.className = 'settings-exercise-actions';
 
             const editBtn = document.createElement('button');
             editBtn.className = 'icon-button';
-            editBtn.style.padding = '6px';
             editBtn.title = 'Edit';
             editBtn.innerHTML = '<i data-lucide="edit" aria-hidden="true"></i>';
             editBtn.addEventListener('click', () => this.openEditExercise(key));
 
             const dupBtn = document.createElement('button');
             dupBtn.className = 'icon-button';
-            dupBtn.style.padding = '6px';
             dupBtn.title = 'Duplicate';
             dupBtn.innerHTML = '<i data-lucide="copy" aria-hidden="true"></i>';
             dupBtn.addEventListener('click', () => this.duplicateExercise(key));
 
             const delBtn = document.createElement('button');
             delBtn.className = 'icon-button';
-            delBtn.style.padding = '6px';
             delBtn.title = 'Delete';
             delBtn.innerHTML = '<i data-lucide="trash" aria-hidden="true"></i>';
             delBtn.addEventListener('click', () => this.showDeleteConfirmation(key));
@@ -780,12 +779,12 @@ class BreathingApp {
             const helper = document.getElementById('musicHelper');
             if (helper) helper.textContent = 'Audio files detected — music control enabled.';
             // ensure UI matches stored setting
-            this.musicVolume && (this.musicVolume.disabled = false);
+            // this.soundVolume && (this.soundVolume.disabled = false); // No longer disabling volume
         } else {
             if (this.musicSettingGroup) this.musicSettingGroup.style.display = '';
             const helper = document.getElementById('musicHelper');
-            if (helper) helper.textContent = 'No audio files detected. Add files to the Audio/ folder and press Rescan.';
-            this.musicVolume && (this.musicVolume.disabled = true);
+            if (helper) helper.textContent = 'No background music files detected. Add files to Audio/ to enable music.';
+            // this.soundVolume && (this.soundVolume.disabled = true); // No longer disabling volume
         }
     }
 
@@ -851,7 +850,7 @@ BreathingApp.prototype.loadSettings = function() {
         if (saved) {
             const parsed = JSON.parse(saved);
             if (typeof parsed.speechVolume === 'number') this.settings.speechVolume = parsed.speechVolume;
-            if (typeof parsed.musicVolume === 'number') this.settings.musicVolume = parsed.musicVolume;
+            if (typeof parsed.soundVolume === 'number') this.settings.soundVolume = parsed.soundVolume;
         }
     } catch (e) {}
     // Reflect settings in UI
@@ -859,14 +858,14 @@ BreathingApp.prototype.loadSettings = function() {
         this.speechVolume.value = this.settings.speechVolume;
         this.speechVolumeValue.textContent = `${this.settings.speechVolume}%`;
     }
-    if (this.musicVolume) {
-        this.musicVolume.value = this.settings.musicVolume;
-        this.musicVolumeValue.textContent = `${this.settings.musicVolume}%`;
+    if (this.soundVolume) {
+        this.soundVolume.value = this.settings.soundVolume;
+        this.soundVolumeValue.textContent = `${this.settings.soundVolume}%`;
     }
     // Show music setting but keep disabled until audio files are detected
     if (this.musicSettingGroup) {
         this.musicSettingGroup.style.display = '';
-        if (this.musicVolume) this.musicVolume.disabled = true;
+        // if (this.soundVolume) this.soundVolume.disabled = true; // No longer disabling
     }
 };
 
@@ -875,11 +874,12 @@ BreathingApp.prototype.initAudio = function() {
     this.audio.files = {
         // Provided by user
         last_breath_now_hold: 'Audio/last-breathe_now-hold.mp3',
+        // Mapped from unused files
+        start_session: 'Audio/three_two_one.mp3',
+        recovery_breathe_in_hold: 'Audio/hold_for_10_seconds.mp3',
         // Optional cues (will play only if files exist)
-        start_session: 'Audio/start.mp3',
         next_cycle: 'Audio/next-cycle.mp3',
         start_hold: 'Audio/hold.mp3',
-        recovery_breathe_in_hold: 'Audio/recovery-breathe-in-hold.mp3',
         session_finished: 'Audio/session-finished.mp3'
     };
 };
@@ -891,7 +891,7 @@ BreathingApp.prototype.playCue = function(key) {
         try {
             const a = new Audio(src);
             a.preload = 'auto';
-            a.volume = this.settings.musicVolume / 100;
+            a.volume = this.settings.soundVolume / 100;
             this.audio.cues[key] = a;
         } catch (e) {
             return false;
@@ -900,7 +900,7 @@ BreathingApp.prototype.playCue = function(key) {
     const audio = this.audio.cues[key];
     try {
         audio.currentTime = 0;
-        audio.volume = this.settings.musicVolume / 100;
+        audio.volume = this.settings.soundVolume / 100;
         const p = audio.play();
         if (p && typeof p.then === 'function') {
             p.catch(() => {});
