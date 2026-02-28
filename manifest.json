@@ -1,16 +1,20 @@
 {
-  "name": "Breathe",
+  "name": "Breathe - Breathing Exercise App",
   "short_name": "Breathe",
-  "start_url": ".",
+  "description": "Guided breathing exercise app with customizable routines, session tracking, and offline support.",
+  "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#1e3a8a",
   "theme_color": "#1e3a8a",
+  "categories": ["health", "fitness", "lifestyle"],
   "icons": [
     {
       "src": "IMG/favicon.png",
       "sizes": "180x180",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ]
 }

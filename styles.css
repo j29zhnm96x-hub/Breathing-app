@@ -1,3 +1,46 @@
+/* CSS Custom Properties for Theming */
+:root {
+    --bg-gradient-start: #9ca3af;
+    --bg-gradient-end: #1e3a8a;
+    --text-primary: #111827;
+    --text-secondary: #374151;
+    --text-muted: #6b7280;
+    --surface: #ffffff;
+    --surface-hover: #f3f4f6;
+    --surface-alt: #f9fafb;
+    --border: #e5e7eb;
+    --border-light: #d1d5db;
+    --accent: #8b5cf6;
+    --accent-dark: #7c3aed;
+    --accent-light: #a78bfa;
+    --success: #10b981;
+    --success-dark: #059669;
+    --danger: #ef4444;
+    --danger-dark: #dc2626;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.2);
+    --modal-bg: rgba(0, 0, 0, 0.5);
+}
+
+/* Dark Mode */
+body.dark-mode {
+    --bg-gradient-start: #111827;
+    --bg-gradient-end: #0f172a;
+    --text-primary: #f3f4f6;
+    --text-secondary: #d1d5db;
+    --text-muted: #9ca3af;
+    --surface: #1f2937;
+    --surface-hover: #374151;
+    --surface-alt: #111827;
+    --border: #374151;
+    --border-light: #4b5563;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 10px 25px rgba(0, 0, 0, 0.5);
+    --modal-bg: rgba(0, 0, 0, 0.7);
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -6,9 +49,10 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(180deg, #9ca3af 0%, #1e3a8a 100%);
+    background: linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-end) 100%);
     min-height: 100vh;
     overflow: hidden;
+    transition: background 0.3s ease;
 }
 
 .app-container {
@@ -77,9 +121,9 @@ body {
     position: absolute;
     top: 100%;
     right: 0;
-    background: white;
+    background: var(--surface);
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    box-shadow: var(--shadow-lg);
     min-width: 200px;
     opacity: 0;
     visibility: hidden;
@@ -98,12 +142,12 @@ body {
 .dropdown-item {
     padding: 12px 16px;
     cursor: pointer;
-    color: #374151;
+    color: var(--text-secondary);
     transition: background 0.2s ease;
 }
 
 .dropdown-item:hover {
-    background: #f3f4f6;
+    background: var(--surface-hover);
 }
 
 .dropdown-item:first-child {
@@ -116,7 +160,7 @@ body {
 
 .dropdown-divider {
     height: 1px;
-    background: #e5e7eb;
+    background: var(--border);
     margin: 4px 0;
 }
 
@@ -230,11 +274,9 @@ body.session-active.paused .button-text::after {
     background: rgba(255, 255, 255, 0.9);
     border: none;
     border-radius: 25px;
-    color: #374151;
+    color: var(--text-secondary);
     font-size: 14px;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -254,11 +296,9 @@ body.session-active.paused .button-text::after {
     background: rgba(255, 255, 255, 0.9);
     border: none;
     border-radius: 25px;
-    color: #374151;
+    color: var(--text-secondary);
     font-size: 14px;
     font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
     cursor: pointer;
     transition: all 0.2s ease;
 }
@@ -283,8 +323,6 @@ body.session-active.paused .button-text::after {
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
-    cursor: pointer;
-    transition: all 0.2s ease;
 }
 
 .cancel-button:hover {
@@ -298,9 +336,6 @@ body.session-active.paused .button-text::after {
     color: rgba(255, 255, 255, 0.6);
     font-size: 12px;
     text-align: center;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 12px;
-    text-align: center;
     margin-top: 20px;
 }
 
@@ -311,7 +346,7 @@ body.session-active.paused .button-text::after {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: var(--modal-bg);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -328,7 +363,7 @@ body.session-active.paused .button-text::after {
 }
 
 .modal {
-    background: white;
+    background: var(--surface);
     border-radius: 16px;
     width: 100%;
     max-width: 400px;
@@ -347,13 +382,13 @@ body.session-active.paused .button-text::after {
     justify-content: space-between;
     align-items: center;
     padding: 20px 24px;
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid var(--border);
 }
 
 .modal-header h2 {
     font-size: 18px;
     font-weight: 600;
-    color: #111827;
+    color: var(--text-primary);
 }
 
 .close-button {
@@ -371,8 +406,8 @@ body.session-active.paused .button-text::after {
 }
 
 .close-button:hover {
-    background: #f3f4f6;
-    color: #374151;
+    background: var(--surface-hover);
+    color: var(--text-secondary);
 }
 
 .modal-content {
@@ -388,7 +423,7 @@ body.session-active.paused .button-text::after {
     display: block;
     font-size: 14px;
     font-weight: 500;
-    color: #374151;
+    color: var(--text-secondary);
     margin-bottom: 8px;
 }
 
@@ -396,7 +431,7 @@ body.session-active.paused .button-text::after {
     width: 100%;
     height: 6px;
     border-radius: 3px;
-    background: #e5e7eb;
+    background: var(--border);
     outline: none;
     -webkit-appearance: none;
     appearance: none;
@@ -422,13 +457,13 @@ body.session-active.paused .button-text::after {
     cursor: pointer;
     border: none;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    appearance: none;
     -webkit-appearance: none;
+    appearance: none;
 }
 
 .volume-value {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--text-muted);
 }
 
 .create-exercise-btn {
@@ -449,7 +484,7 @@ body.session-active.paused .button-text::after {
 }
 
 .create-exercise-btn:hover {
-    background: #7c3aed;
+    background: var(--accent-dark);
     transform: translateY(-1px);
 }
 
@@ -490,27 +525,29 @@ body.session-active.paused .button-text::after {
     display: block;
     font-size: 14px;
     font-weight: 500;
-    color: #374151;
+    color: var(--text-secondary);
     margin-bottom: 6px;
 }
 
 .form-group input {
     width: 100%;
     padding: 10px 12px;
-    border: 1px solid #d1d5db;
+    border: 1px solid var(--border-light);
     border-radius: 6px;
     font-size: 14px;
+    background: var(--surface);
+    color: var(--text-primary);
     transition: border-color 0.2s ease;
 }
 
 .form-group input:focus {
     outline: none;
-    border-color: #8b5cf6;
+    border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
 }
 
 .cycle-input {
-    background: #f9fafb;
+    background: var(--surface-alt);
     border-radius: 8px;
     padding: 16px;
     margin-bottom: 16px;
@@ -519,7 +556,7 @@ body.session-active.paused .button-text::after {
 .cycle-input h4 {
     font-size: 14px;
     font-weight: 600;
-    color: #374151;
+    color: var(--text-secondary);
     margin-bottom: 12px;
 }
 
@@ -650,9 +687,9 @@ body.session-active.paused .button-text::after {
     align-items: center;
     padding: 8px 10px;
     border-radius: 8px;
-    background: #fff;
+    background: var(--surface);
     margin-bottom: 8px;
-    box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+    box-shadow: var(--shadow-sm);
 }
 
 .settings-exercise-info {
@@ -663,12 +700,12 @@ body.session-active.paused .button-text::after {
 
 .settings-exercise-title {
     font-weight: 600;
-    color: #111827;
+    color: var(--text-primary);
 }
 
 .settings-exercise-meta {
     font-size: 12px;
-    color: #6b7280;
+    color: var(--text-muted);
 }
 
 .settings-exercise-actions {
@@ -681,14 +718,279 @@ body.session-active.paused .button-text::after {
     width: 36px;
     height: 36px;
     border-radius: 6px;
-    background: rgba(243,244,246,1);
-    color: #374151;
+    background: var(--surface-hover);
+    color: var(--text-secondary);
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 
 .settings-exercise-actions .icon-button:hover {
-    background: rgba(241,243,245,1);
+    background: var(--border);
     transform: translateY(-1px);
+}
+
+/* Toggle Switch */
+.toggle-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 48px;
+    height: 26px;
+    flex-shrink: 0;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--border);
+    border-radius: 26px;
+    transition: background 0.3s ease;
+}
+
+.toggle-slider::before {
+    content: '';
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    bottom: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: transform 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+    background: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+    transform: translateX(22px);
+}
+
+.toggle-switch input:focus-visible + .toggle-slider {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* History Modal Styles */
+.history-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.stat-card {
+    background: var(--surface-alt);
+    border-radius: 12px;
+    padding: 16px 12px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.2;
+}
+
+.stat-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.history-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.history-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 16px;
+}
+
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    border-radius: 8px;
+    background: var(--surface-alt);
+    margin-bottom: 8px;
+    transition: background 0.2s ease;
+}
+
+.history-item:hover {
+    background: var(--surface-hover);
+}
+
+.history-item-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.history-item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text-primary);
+}
+
+.history-item-date {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.history-item-duration {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--accent);
+    white-space: nowrap;
+}
+
+.history-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 24px 12px;
+}
+
+.clear-history-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    background: transparent;
+    border: 1px solid var(--danger);
+    border-radius: 8px;
+    color: var(--danger);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clear-history-btn:hover {
+    background: var(--danger);
+    color: white;
+}
+
+/* Breathing Animation Pulse */
+@keyframes breathPulse {
+    0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3); }
+    50% { transform: scale(1.03); box-shadow: 0 12px 40px rgba(139, 92, 246, 0.5); }
+}
+
+body.session-active .breathing-button:not(.pressed) {
+    animation: breathPulse 2s ease-in-out infinite;
+}
+
+body.session-active.paused .breathing-button {
+    animation: none;
+}
+
+/* Session progress indicator */
+.session-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 0 0 24px 24px;
+    transition: width 0.3s ease;
+}
+
+/* Dark mode overrides for inline styles in modals */
+body.dark-mode .modal-content p {
+    color: var(--text-secondary) !important;
+}
+
+body.dark-mode .confirm-cancel-btn {
+    background: var(--danger);
+}
+
+body.dark-mode .keep-going-btn {
+    background: var(--success);
+}
+
+/* Smooth transition for theme changes */
+.modal, .modal-header, .modal-content, .setting-group,
+.form-group input, .cycle-input, .settings-exercise-item,
+.stat-card, .history-item {
+    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* Modal description and actions (moved from inline styles) */
+.modal-description {
+    color: var(--text-secondary);
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+/* Music helper row */
+.music-helper-row {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.rescan-btn {
+    padding: 6px 8px;
+    width: auto;
+    background: var(--border);
+    color: var(--text-secondary);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.rescan-btn:hover {
+    background: var(--border-light);
+}
+
+/* Custom exercises title in settings */
+.custom-exercises-title {
+    margin-top: 16px;
+    margin-bottom: 8px;
+    color: var(--text-secondary);
+    font-size: 14px;
 }
