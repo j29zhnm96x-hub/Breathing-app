@@ -53,6 +53,21 @@ body {
     min-height: 100vh;
     overflow: hidden;
     transition: background 0.3s ease;
+    /* Prevent text selection on long press */
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    /* Prevent touch scrolling and zooming */
+    touch-action: manipulation;
+}
+
+/* Re-enable text selection for form inputs */
+input, textarea, select {
+    -webkit-user-select: text;
+    -moz-user-select: text;
+    -ms-user-select: text;
+    user-select: text;
 }
 
 .app-container {
@@ -205,6 +220,8 @@ body {
     box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
     position: relative;
     overflow: hidden;
+    /* Prevent double-tap zoom on mobile */
+    touch-action: manipulation;
 }
 
 .breathing-button:hover {
@@ -938,6 +955,18 @@ body.dark-mode .confirm-cancel-btn {
 
 body.dark-mode .keep-going-btn {
     background: var(--success);
+}
+
+/* Dark mode overrides for control buttons */
+body.dark-mode .start-button,
+body.dark-mode .pause-button {
+    color: #1f2937; /* Dark text for visibility on light background */
+}
+
+body.dark-mode .start-button:hover,
+body.dark-mode .pause-button:hover {
+    background: white;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 /* Smooth transition for theme changes */
