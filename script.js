@@ -37,6 +37,8 @@ class BreathingApp {
             cues: {},
             files: {}
         };
+        this.audioUnlocked = false;
+        this.recoveryCuePlayed = false;
         this.initAudio();
         
         this.initializeElements();
@@ -50,6 +52,48 @@ class BreathingApp {
         lucide.createIcons();
         // Try to detect audio files on load to enable music UI
         setTimeout(() => this.checkForAudioFiles(), 0);
+    }
+
+    unlockAudio() {
+        // iOS Safari often blocks audio until a user gesture occurs.
+        // Call this from a click/touch handler (e.g., Start button).
+        if (this.audioUnlocked) return;
+        this.audioUnlocked = true;
+
+        try {
+            Object.keys(this.audio.files || {}).forEach((key) => {
+                const src = this.audio.files[key];
+                if (!src) return;
+                if (!this.audio.cues[key]) {
+                    const a = new Audio(src);
+                    a.preload = 'auto';
+                    a.volume = 0;
+                    this.audio.cues[key] = a;
+                }
+            });
+
+            // Attempt to start/stop one audio element silently.
+            const firstKey = Object.keys(this.audio.cues || {})[0];
+            const audio = firstKey ? this.audio.cues[firstKey] : null;
+            if (audio) {
+                const p = audio.play();
+                if (p && typeof p.then === 'function') {
+                    p.then(() => {
+                        setTimeout(() => {
+                            try {
+                                audio.pause();
+                                audio.currentTime = 0;
+                                audio.volume = this.settings.soundVolume / 100;
+                            } catch (_) {}
+                        }, 50);
+                    }).catch(() => {
+                        // If unlock fails, we'll still fallback to speech.
+                    });
+                }
+            }
+        } catch (e) {
+            // Best-effort only.
+        }
     }
     
     initializeElements() {
@@ -245,6 +289,9 @@ class BreathingApp {
     
     handleBreathStart() {
         if (this.sessionState !== 'breathing' || this.isPaused) return;
+
+        // Ensure audio is unlocked from a user gesture.
+        this.unlockAudio();
         
         this.breathingBtn.classList.add('pressed');
         this.buttonText.textContent = 'Inhale';
@@ -276,6 +323,9 @@ class BreathingApp {
     }
     
     startSession() {
+        // Start button click is a user gesture - unlock audio here.
+        this.unlockAudio();
+
         this.sessionState = 'breathing';
         this.currentCycle = 0;
         this.currentBreath = 0;
@@ -299,6 +349,7 @@ class BreathingApp {
     
     startHoldPhase() {
         this.sessionState = 'holding';
+        this.recoveryCuePlayed = false;
         const currentCycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
         this.timeRemaining = currentCycleData.holdTime;
         
@@ -319,6 +370,13 @@ class BreathingApp {
             
             if (this.timeRemaining <= 0) {
                 clearInterval(this.timer);
+                // Play cue right as hold ends (before recovery breath starts)
+                if (!this.recoveryCuePlayed) {
+                    this.recoveryCuePlayed = true;
+                    if (!this.playCue('recovery_breathe_in_hold')) {
+                        this.speak('Breathe in and hold');
+                    }
+                }
                 this.startRecoveryPhase();
             }
         }, 100);
@@ -326,9 +384,6 @@ class BreathingApp {
     
     startRecoveryPhase() {
         this.sessionState = 'recovery';
-        if (!this.playCue('recovery_breathe_in_hold')) {
-            this.speak('Breathe in and hold');
-        }
         this.timeRemaining = 10;
         
         this.buttonText.textContent = 'Recovery Breath';
@@ -449,6 +504,13 @@ class BreathingApp {
                 
                 if (this.timeRemaining <= 0) {
                     clearInterval(this.timer);
+                    // Play cue right as hold ends (before recovery breath starts)
+                    if (!this.recoveryCuePlayed) {
+                        this.recoveryCuePlayed = true;
+                        if (!this.playCue('recovery_breathe_in_hold')) {
+                            this.speak('Breathe in and hold');
+                        }
+                    }
                     this.startRecoveryPhase();
                 }
             }, 100);
