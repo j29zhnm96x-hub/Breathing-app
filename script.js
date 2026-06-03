@@ -27,7 +27,9 @@ class BreathingApp {
             speechVolume: 70,
             soundVolume: 50,
             darkMode: false,
-            hapticFeedback: true
+            hapticFeedback: true,
+            backgroundMusic: false,
+            guidedVoice: false
         };
         this.editingExerciseKey = null;
         // Session history
@@ -39,6 +41,10 @@ class BreathingApp {
         };
         this.audioUnlocked = false;
         this.recoveryCuePlayed = false;
+        this.cycleTimeout = null; // reference for cycle transition setTimeout
+        this.backgroundAudio = null;
+        this.guideCounter = 0; // tracks breaths for periodic guidance
+        this.guideInterval = 5; // speak guidance every N breaths
         this.initAudio();
         
         this.initializeElements();
@@ -49,11 +55,14 @@ class BreathingApp {
         this.updateExerciseInfo();
         
         // Initialize Lucide icons
-        lucide.createIcons();
+        try { lucide.createIcons(); } catch (_) {}
         // Try to detect audio files on load to enable music UI
         setTimeout(() => this.checkForAudioFiles(), 0);
     }
-
+    
+    // ===================
+    // Audio Unlock (iOS)
+    // ===================
     unlockAudio() {
         // iOS Safari often blocks audio until a user gesture occurs.
         // Call this from a click/touch handler (e.g., Start button).
@@ -61,41 +70,34 @@ class BreathingApp {
         this.audioUnlocked = true;
 
         try {
-            Object.keys(this.audio.files || {}).forEach((key) => {
-                const src = this.audio.files[key];
-                if (!src) return;
-                if (!this.audio.cues[key]) {
-                    const a = new Audio(src);
-                    a.preload = 'auto';
-                    a.volume = 0;
-                    this.audio.cues[key] = a;
-                }
-            });
+            // Silent tone to unlock audio context on iOS
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.001;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(0);
+            osc.stop(ctx.currentTime + 0.05);
 
-            // Attempt to start/stop one audio element silently.
+            // Quick play/pause on first successfully loaded cue (if any exist from earlier)
             const firstKey = Object.keys(this.audio.cues || {})[0];
             const audio = firstKey ? this.audio.cues[firstKey] : null;
             if (audio) {
-                const p = audio.play();
-                if (p && typeof p.then === 'function') {
-                    p.then(() => {
-                        setTimeout(() => {
-                            try {
-                                audio.pause();
-                                audio.currentTime = 0;
-                                audio.volume = this.settings.soundVolume / 100;
-                            } catch (_) {}
-                        }, 50);
-                    }).catch(() => {
-                        // If unlock fails, we'll still fallback to speech.
-                    });
-                }
+                audio.play().then(() => {
+                    setTimeout(() => {
+                        try { audio.pause(); audio.currentTime = 0; } catch (_) {}
+                    }, 50);
+                }).catch(() => {});
             }
         } catch (e) {
             // Best-effort only.
         }
     }
     
+    // ===================
+    // UI Element References
+    // ===================
     initializeElements() {
         // Main elements
         this.breathingBtn = document.getElementById('breathingBtn');
@@ -157,13 +159,29 @@ class BreathingApp {
         // Settings toggles
         this.darkModeToggle = document.getElementById('darkModeToggle');
         this.hapticToggle = document.getElementById('hapticToggle');
+        this.bgMusicToggle = document.getElementById('bgMusicToggle');
+        this.guidedVoiceToggle = document.getElementById('guidedVoiceToggle');
         
+        // Generic confirm modal elements
+        this.genericConfirmModal = document.getElementById('genericConfirmModal');
+        this.genericConfirmTitle = document.getElementById('genericConfirmTitle');
+        this.genericConfirmDesc = document.getElementById('genericConfirmDesc');
+        this.genericConfirmYes = document.getElementById('genericConfirmYes');
+        this.genericConfirmNo = document.getElementById('genericConfirmNo');
+        this.confirmCallback = null;
+
+        // Progress indicator
+        this.sessionProgress = document.getElementById('sessionProgress');
+
         // Create timer display
         this.timerDisplay = document.createElement('div');
         this.timerDisplay.className = 'timer-display';
         this.breathingBtn.parentElement.appendChild(this.timerDisplay);
     }
     
+    // ===================
+    // Event Bindings
+    // ===================
     bindEvents() {
         // Main button events
         this.breathingBtn.addEventListener('mousedown', () => this.handleBreathStart());
@@ -250,6 +268,25 @@ class BreathingApp {
         const rescanBtn = document.getElementById('rescanAudioBtn');
         if (rescanBtn) rescanBtn.addEventListener('click', () => this.checkForAudioFiles());
 
+        // Generic confirm modal events
+        if (this.genericConfirmYes) this.genericConfirmYes.addEventListener('click', () => this.confirmAction());
+        if (this.genericConfirmNo) this.genericConfirmNo.addEventListener('click', () => this.closeConfirm());
+        if (this.genericConfirmModal) this.genericConfirmModal.addEventListener('click', (e) => {
+            if (e.target === this.genericConfirmModal) this.closeConfirm();
+        });
+
+        // Background music toggle
+        if (this.bgMusicToggle) this.bgMusicToggle.addEventListener('change', () => {
+            this.settings.backgroundMusic = this.bgMusicToggle.checked;
+            this.saveSettings();
+        });
+
+        // Guided voice toggle
+        if (this.guidedVoiceToggle) this.guidedVoiceToggle.addEventListener('change', () => {
+            this.settings.guidedVoice = this.guidedVoiceToggle.checked;
+            this.saveSettings();
+        });
+
         // History modal events
         if (this.historyBtn) this.historyBtn.addEventListener('click', () => this.openHistory());
         if (this.closeHistoryBtn) this.closeHistoryBtn.addEventListener('click', () => this.closeModal(this.historyModal));
@@ -270,7 +307,8 @@ class BreathingApp {
         // Global ESC to close modals
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                if (this.deleteConfirmModal && this.deleteConfirmModal.classList.contains('active')) this.closeDeleteConfirmation();
+                if (this.genericConfirmModal && this.genericConfirmModal.classList.contains('active')) this.closeConfirm();
+                else if (this.deleteConfirmModal && this.deleteConfirmModal.classList.contains('active')) this.closeDeleteConfirmation();
                 else if (this.historyModal && this.historyModal.classList.contains('active')) this.closeModal(this.historyModal);
                 else if (this.createExerciseModal.classList.contains('active')) this.closeModal(this.createExerciseModal);
                 else if (this.settingsModal.classList.contains('active')) this.closeModal(this.settingsModal);
@@ -287,6 +325,9 @@ class BreathingApp {
         });
     }
     
+    // ===================
+    // Breath Detection — called from button events
+    // ===================
     handleBreathStart() {
         if (this.sessionState !== 'breathing' || this.isPaused) return;
 
@@ -294,12 +335,14 @@ class BreathingApp {
         this.unlockAudio();
         
         this.breathingBtn.classList.add('pressed');
-        this.buttonText.textContent = 'Inhale';
+        const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        const breathNum = this.currentBreath + 1;
+        this.buttonText.innerHTML = `Inhale <span class="breath-count">${breathNum} / ${cycleData.breaths}</span>`;
+        this.guideInhale();
         this.vibrate(30);
 
         // If this is the last inhale of the cycle, play the special cue
-        const currentCycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
-        if (this.currentBreath === currentCycleData.breaths - 1) {
+        if (this.currentBreath === cycleData.breaths - 1) {
             this.playCue('last_breath_now_hold');
         }
     }
@@ -308,13 +351,15 @@ class BreathingApp {
         if (this.sessionState !== 'breathing' || this.isPaused) return;
         
         this.breathingBtn.classList.remove('pressed');
-        this.buttonText.textContent = 'Exhale';
+        const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        this.buttonText.innerHTML = `Exhale <span class="breath-count">${this.currentBreath + 1} / ${cycleData.breaths}</span>`;
+        this.guideExhale();
         this.vibrate(15);
         
         this.currentBreath++;
-        const currentCycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        this.updateProgress();
         
-        if (this.currentBreath >= currentCycleData.breaths) {
+        if (this.currentBreath >= cycleData.breaths) {
             // Last breath of cycle
             setTimeout(() => {
                 this.startHoldPhase();
@@ -322,7 +367,11 @@ class BreathingApp {
         }
     }
     
+    // ===================
+    // Session Lifecycle — Start, Hold, Recovery, Cycles, Finish, Reset
+    // ===================
     startSession() {
+        try {
         // Start button click is a user gesture - unlock audio here.
         this.unlockAudio();
 
@@ -334,58 +383,73 @@ class BreathingApp {
         
         document.body.classList.add('session-active');
         document.body.classList.remove('paused');
+        this.updateProgress();
         this.startBtn.style.display = 'none';
         this.pauseBtn.style.display = 'flex';
         this.cancelBtn.style.display = 'flex';
         
         this.buttonText.textContent = 'Ready - press and hold to inhale';
+        this.guideCounter = 0;
         this.playCue('start_session');
+        this.startBackgroundMusic();
         this.vibrate(100);
         
         setTimeout(() => {
             this.buttonText.textContent = 'Ready';
         }, 3000);
+        } catch (e) {
+            console.warn('Session start error:', e);
+            this.resetSession();
+        }
     }
     
     startHoldPhase() {
         this.sessionState = 'holding';
         this.recoveryCuePlayed = false;
+        this.updateProgress();
         const currentCycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
         this.timeRemaining = currentCycleData.holdTime;
         
         this.buttonText.textContent = 'Hold';
         this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
         this.timerDisplay.classList.add('visible');
+        this.guideHold();
         this.vibrate([100, 50, 100]); // double vibration for hold phase
         
         const startTime = Date.now();
         const totalTime = this.timeRemaining;
 
         this.timer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            this.timeRemaining = totalTime - elapsed;
-            
-            if (this.timeRemaining < 0) this.timeRemaining = 0;
-            this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
-            
-            if (this.timeRemaining <= 0) {
-                clearInterval(this.timer);
-                // Play cue right as hold ends (before recovery breath starts)
-                if (!this.recoveryCuePlayed) {
-                    this.recoveryCuePlayed = true;
-                    if (!this.playCue('recovery_breathe_in_hold')) {
-                        this.speak('Breathe in and hold');
+            try {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                this.timeRemaining = totalTime - elapsed;
+                
+                if (this.timeRemaining < 0) this.timeRemaining = 0;
+                this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
+                this.updateProgress();
+                
+                if (this.timeRemaining <= 0) {
+                    clearInterval(this.timer);
+                    if (!this.recoveryCuePlayed) {
+                        this.recoveryCuePlayed = true;
+                        if (!this.playCue('recovery_breathe_in_hold')) {
+                            this.speak('Breathe in and hold');
+                        }
                     }
+                    this.startRecoveryPhase();
                 }
-                this.startRecoveryPhase();
+            } catch (e) {
+                console.warn('Hold timer error:', e);
+                clearInterval(this.timer);
             }
-        }, 100);
+        }, 50);
     }
     
     startRecoveryPhase() {
         this.sessionState = 'recovery';
         this.timeRemaining = 10;
         
+        this.guideRecovery();
         this.buttonText.textContent = 'Recovery Breath';
         this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
         
@@ -393,32 +457,40 @@ class BreathingApp {
         const totalTime = this.timeRemaining;
 
         this.timer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            this.timeRemaining = totalTime - elapsed;
-            
-            if (this.timeRemaining < 0) this.timeRemaining = 0;
-            this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
-            
-            if (this.timeRemaining <= 0) {
+            try {
+                const elapsed = Math.floor((Date.now() - startTime) / 1000);
+                this.timeRemaining = totalTime - elapsed;
+                
+                if (this.timeRemaining < 0) this.timeRemaining = 0;
+                this.timerDisplay.textContent = this.formatTime(this.timeRemaining);
+                
+                if (this.timeRemaining <= 0) {
+                    clearInterval(this.timer);
+                    this.nextCycle();
+                }
+            } catch (e) {
+                console.warn('Recovery timer error:', e);
                 clearInterval(this.timer);
-                this.nextCycle();
             }
-        }, 100);
+        }, 50);
     }
     
     nextCycle() {
         this.currentCycle++;
         this.currentBreath = 0;
+        this.updateProgress();
         
         if (this.currentCycle >= this.exercises[this.currentExercise].cycles.length) {
             this.finishSession();
             return;
         }
         
-    this.timerDisplay.classList.remove('visible');
-    this.playCue('next_cycle');
+        this.timerDisplay.classList.remove('visible');
+        this.guideCycle(this.currentCycle + 1);
+        this.playCue('next_cycle');
         
-        setTimeout(() => {
+        this.cycleTimeout = setTimeout(() => {
+            this.cycleTimeout = null;
             this.sessionState = 'breathing';
             this.buttonText.textContent = 'Ready';
         }, 4000);
@@ -427,6 +499,7 @@ class BreathingApp {
     finishSession() {
         this.sessionState = 'finished';
         this.timerDisplay.classList.remove('visible');
+        this.guideSessionEnd();
         if (!this.playCue('session_finished')) {
             this.speak('Session finished - well done');
         }
@@ -445,6 +518,7 @@ class BreathingApp {
         this.currentCycle = 0;
         this.currentBreath = 0;
         this.isPaused = false;
+        this.updateProgress();
         
         document.body.classList.remove('session-active');
         document.body.classList.remove('paused');
@@ -458,33 +532,64 @@ class BreathingApp {
             clearInterval(this.timer);
             this.timer = null;
         }
+        if (this.cycleTimeout) {
+            clearTimeout(this.cycleTimeout);
+            this.cycleTimeout = null;
+        }
+        this.stopBackgroundMusic();
     }
     
+    // ===================
+    // Pause / Resume
+    // ===================
     togglePause() {
         if (this.isPaused) {
             // Resume
             this.isPaused = false;
             this.pauseBtn.querySelector('span').textContent = 'PAUSE';
             this.pauseBtn.querySelector('i').setAttribute('data-lucide', 'pause');
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
             document.body.classList.remove('paused');
+            
+            // Resume background music
+            if (this.backgroundAudio) {
+                this.backgroundAudio.play().catch(() => {});
+            }
             
             // Resume timer if in holding or recovery state
             if (this.sessionState === 'holding' || this.sessionState === 'recovery') {
                 this.resumeTimer();
+            }
+            // Resume cycle transition if paused during inter-cycle gap
+            if (this.sessionState === 'breathing' && this.cycleTimeout === null) {
+                this.cycleTimeout = setTimeout(() => {
+                    this.cycleTimeout = null;
+                    this.sessionState = 'breathing';
+                    this.buttonText.textContent = 'Ready';
+                }, 4000);
             }
         } else {
             // Pause
             this.isPaused = true;
             this.pauseBtn.querySelector('span').textContent = 'RESUME';
             this.pauseBtn.querySelector('i').setAttribute('data-lucide', 'play');
-            lucide.createIcons();
+            try { lucide.createIcons(); } catch (_) {}
             document.body.classList.add('paused');
+            
+            // Pause background music
+            if (this.backgroundAudio) {
+                try { this.backgroundAudio.pause(); } catch (_) {}
+            }
             
             // Pause timer if running
             if (this.timer) {
                 clearInterval(this.timer);
                 this.timer = null;
+            }
+            // Pause cycle transition if waiting between cycles
+            if (this.cycleTimeout) {
+                clearTimeout(this.cycleTimeout);
+                this.cycleTimeout = null;
             }
         }
     }
@@ -504,7 +609,6 @@ class BreathingApp {
                 
                 if (this.timeRemaining <= 0) {
                     clearInterval(this.timer);
-                    // Play cue right as hold ends (before recovery breath starts)
                     if (!this.recoveryCuePlayed) {
                         this.recoveryCuePlayed = true;
                         if (!this.playCue('recovery_breathe_in_hold')) {
@@ -513,7 +617,7 @@ class BreathingApp {
                     }
                     this.startRecoveryPhase();
                 }
-            }, 100);
+            }, 50);
         } else if (this.sessionState === 'recovery') {
             this.timer = setInterval(() => {
                 if (this.isPaused) return;
@@ -527,10 +631,43 @@ class BreathingApp {
                     clearInterval(this.timer);
                     this.nextCycle();
                 }
-            }, 100);
+            }, 50);
         }
     }
     
+    // ===================
+    // Pause / Resume
+    // ===================
+    // Generic Confirmation Dialog
+    // ===================
+    showConfirm(title, description, confirmLabel, callback) {
+        if (this.genericConfirmTitle) this.genericConfirmTitle.textContent = title;
+        if (this.genericConfirmDesc) this.genericConfirmDesc.textContent = description;
+        if (this.genericConfirmYes) this.genericConfirmYes.textContent = confirmLabel;
+        this.confirmCallback = callback;
+        this.lastFocusedElement = document.activeElement;
+        if (this.genericConfirmModal) {
+            this.genericConfirmModal.classList.add('active');
+            if (this.genericConfirmYes) this.genericConfirmYes.focus();
+        }
+    }
+
+    closeConfirm() {
+        if (this.genericConfirmModal) this.genericConfirmModal.classList.remove('active');
+        this.confirmCallback = null;
+        if (this.lastFocusedElement && typeof this.lastFocusedElement.focus === 'function') {
+            this.lastFocusedElement.focus();
+            this.lastFocusedElement = null;
+        }
+    }
+
+    confirmAction() {
+        if (typeof this.confirmCallback === 'function') {
+            this.confirmCallback();
+        }
+        this.closeConfirm();
+    }
+
     showCancelConfirmation() {
         this.cancelConfirmModal.classList.add('active');
     }
@@ -546,18 +683,100 @@ class BreathingApp {
             clearInterval(this.timer);
             this.timer = null;
         }
+        if (this.cycleTimeout) {
+            clearTimeout(this.cycleTimeout);
+            this.cycleTimeout = null;
+        }
         
         this.timerDisplay.classList.remove('visible');
         this.resetSession();
     }
     
+    // ===================
+    // UI Utilities — Progress Indicator, Speech, Formatting
+    // ===================
+    updateProgress() {
+        if (!this.sessionProgress) return;
+        let pct = 0;
+        if (this.sessionState === 'breathing') {
+            const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+            if (cycleData && cycleData.breaths > 0) {
+                pct = (this.currentBreath / cycleData.breaths) * 100;
+            }
+            this.sessionProgress.style.background = `conic-gradient(var(--accent) ${pct}%, transparent ${pct}%)`;
+            this.sessionProgress.classList.add('visible');
+            return;
+        }
+        if (this.sessionState === 'holding') {
+            const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+            if (cycleData && cycleData.holdTime > 0) {
+                // Count down: start at 100%, decrease as hold progresses
+                const elapsed = cycleData.holdTime - this.timeRemaining;
+                pct = (elapsed / cycleData.holdTime) * 100;
+            }
+            this.sessionProgress.style.background = `conic-gradient(var(--accent) ${pct}%, transparent ${pct}%)`;
+            this.sessionProgress.classList.add('visible');
+            return;
+        }
+        this.sessionProgress.classList.remove('visible');
+    }
+
     speak(text) {
         if ('speechSynthesis' in window) {
+            // Cancel any previous speech to prevent overlapping
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.volume = this.settings.speechVolume / 100;
             utterance.rate = 0.8;
             speechSynthesis.speak(utterance);
         }
+    }
+
+    // ===================
+    // Guided Voice — Optional breath pacing
+    // ===================
+    guideInhale() {
+        if (!this.settings.guidedVoice) return;
+        this.guideCounter++;
+        // Speak every Nth breath, plus always on the last breath of a cycle
+        const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        const isLastBreath = this.currentBreath >= cycleData.breaths - 1;
+        const isInterval = this.guideCounter % this.guideInterval === 0;
+        if (isLastBreath || isInterval || this.guideCounter <= 3) {
+            this.speak('In');
+        }
+    }
+
+    guideExhale() {
+        if (!this.settings.guidedVoice) return;
+        const cycleData = this.exercises[this.currentExercise].cycles[this.currentCycle];
+        const isLastBreath = this.currentBreath >= cycleData.breaths - 1;
+        const isInterval = this.guideCounter % this.guideInterval === 0;
+        if (isLastBreath || isInterval || this.guideCounter <= 3) {
+            this.speak('Out');
+        }
+    }
+
+    guideHold() {
+        if (!this.settings.guidedVoice) return;
+        this.speak('Hold');
+    }
+
+    guideRecovery() {
+        if (!this.settings.guidedVoice) return;
+        this.speak('Recovery breath');
+    }
+
+    guideCycle(num) {
+        if (!this.settings.guidedVoice) return;
+        this.speak(`Cycle ${num}`);
+    }
+
+    guideSessionEnd() {
+        if (!this.settings.guidedVoice) return;
+        this.speak('Well done');
     }
     
     formatTime(seconds) {
@@ -566,6 +785,9 @@ class BreathingApp {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
     
+    // ===================
+    // Exercise Selection — Dropdown
+    // ===================
     toggleDropdown() {
         this.exerciseMenu.classList.toggle('active');
         const expanded = this.exerciseMenu.classList.contains('active');
@@ -579,9 +801,18 @@ class BreathingApp {
     
     selectExercise(exerciseKey) {
         if (this.sessionState !== 'ready') {
-            const proceed = window.confirm('Switching exercises will cancel your current session. Continue?');
-            if (!proceed) return;
-            this.resetSession();
+            this.showConfirm(
+                'Switch Exercise?',
+                'Switching exercises will cancel your current session. Continue?',
+                'Yes, Switch',
+                () => {
+                    this.resetSession();
+                    this.currentExercise = exerciseKey;
+                    this.updateExerciseInfo();
+                    this.closeDropdown();
+                }
+            );
+            return;
         }
         this.currentExercise = exerciseKey;
         this.updateExerciseInfo();
@@ -594,6 +825,9 @@ class BreathingApp {
         this.cycleCount.textContent = `${exercise.cycles.length}×`;
     }
     
+    // ===================
+    // Settings Modal
+    // ===================
     openSettings() {
         this.lastFocusedElement = document.activeElement;
         this.settingsModal.classList.add('active');
@@ -636,6 +870,9 @@ class BreathingApp {
         this.saveSettings();
     }
     
+    // ===================
+    // Custom Exercise CRUD — Create, Edit, Save, Delete
+    // ===================
     generateCycleInputs() {
         const cycleCount = parseInt(this.cycleCountInput.value);
         this.cycleInputs.innerHTML = '';
@@ -823,7 +1060,7 @@ class BreathingApp {
         });
 
         // re-render icons inside list
-        lucide.createIcons();
+        try { lucide.createIcons(); } catch (_) {}
     }
 
     showDeleteConfirmation(key) {
@@ -868,9 +1105,11 @@ class BreathingApp {
         this.showDeleteConfirmation(key);
     }
 
-    // Attempt to detect audio files in the Audio/ folder. If found, enable music controls.
+    // Detect background music audio files. Toggle is always visible but disabled if no files found.
     async checkForAudioFiles() {
-        // candidate filenames to try
+        const helper = document.getElementById('musicHelper');
+        if (helper) helper.textContent = 'Scanning for audio files...';
+        
         const candidates = [
             'Audio/ambient.mp3',
             'Audio/ambient.ogg',
@@ -881,12 +1120,8 @@ class BreathingApp {
         for (const path of candidates) {
             try {
                 const resp = await fetch(path, { method: 'HEAD' });
-                if (resp && resp.ok) {
-                    found = true;
-                    break;
-                }
+                if (resp && resp.ok) { found = true; break; }
             } catch (e) {
-                // try full GET as some servers don't allow HEAD
                 try {
                     const r2 = await fetch(path);
                     if (r2 && r2.ok) { found = true; break; }
@@ -895,16 +1130,16 @@ class BreathingApp {
         }
 
         if (found) {
-            if (this.musicSettingGroup) this.musicSettingGroup.style.display = '';
-            const helper = document.getElementById('musicHelper');
-            if (helper) helper.textContent = 'Audio files detected — music control enabled.';
-            // ensure UI matches stored setting
-            // this.soundVolume && (this.soundVolume.disabled = false); // No longer disabling volume
+            if (this.bgMusicToggle) this.bgMusicToggle.disabled = false;
+            if (helper) helper.textContent = 'Background music files detected.';
         } else {
-            if (this.musicSettingGroup) this.musicSettingGroup.style.display = '';
-            const helper = document.getElementById('musicHelper');
-            if (helper) helper.textContent = 'No background music files detected. Add files to Audio/ to enable music.';
-            // this.soundVolume && (this.soundVolume.disabled = true); // No longer disabling volume
+            if (this.bgMusicToggle) {
+                this.bgMusicToggle.disabled = true;
+                this.bgMusicToggle.checked = false;
+                this.settings.backgroundMusic = false;
+                this.saveSettings();
+            }
+            if (helper) helper.textContent = 'No background music files found. Add ambient tracks to Audio/ to enable.';
         }
     }
 
@@ -1097,10 +1332,16 @@ class BreathingApp {
     }
 
     clearHistory() {
-        if (!confirm('Clear all session history? This cannot be undone.')) return;
-        this.history = [];
-        this.saveHistory();
-        this.renderHistory();
+        this.showConfirm(
+            'Clear History?',
+            'Clear all session history? This cannot be undone.',
+            'Yes, Clear',
+            () => {
+                this.history = [];
+                this.saveHistory();
+                this.renderHistory();
+            }
+        );
     }
 
     // ===================
@@ -1118,6 +1359,152 @@ class BreathingApp {
         div.textContent = str;
         return div.innerHTML;
     }
+
+    // ===================
+    // Audio — Speech Fallback
+    // ===================
+    speakFallback(key) {
+        const messages = {
+            start_session: 'Three, two, one, begin',
+            last_breath_now_hold: 'Last breath, now hold',
+            recovery_breathe_in_hold: 'Breathe in and hold for ten seconds',
+            next_cycle: 'Next cycle',
+            start_hold: 'Hold the breath',
+            session_finished: 'Session finished, well done'
+        };
+        if (messages[key]) this.speak(messages[key]);
+    }
+
+    // ===================
+    // Settings — Persistence
+    // ===================
+    saveSettings() {
+        try {
+            localStorage.setItem('breathingAppSettings', JSON.stringify(this.settings));
+        } catch (e) {}
+    }
+
+    loadSettings() {
+        try {
+            const saved = localStorage.getItem('breathingAppSettings');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (typeof parsed.speechVolume === 'number') this.settings.speechVolume = parsed.speechVolume;
+                if (typeof parsed.soundVolume === 'number') this.settings.soundVolume = parsed.soundVolume;
+                if (typeof parsed.darkMode === 'boolean') this.settings.darkMode = parsed.darkMode;
+                if (typeof parsed.hapticFeedback === 'boolean') this.settings.hapticFeedback = parsed.hapticFeedback;
+                if (typeof parsed.backgroundMusic === 'boolean') this.settings.backgroundMusic = parsed.backgroundMusic;
+                if (typeof parsed.guidedVoice === 'boolean') this.settings.guidedVoice = parsed.guidedVoice;
+        }
+        } catch (e) {}
+        // Reflect settings in UI
+        if (this.speechVolume) {
+            this.speechVolume.value = this.settings.speechVolume;
+            this.speechVolumeValue.textContent = `${this.settings.speechVolume}%`;
+        }
+        if (this.soundVolume) {
+            this.soundVolume.value = this.settings.soundVolume;
+            this.soundVolumeValue.textContent = `${this.settings.soundVolume}%`;
+        }
+        // Apply dark mode on load
+        if (this.settings.darkMode) {
+            document.body.classList.add('dark-mode');
+            const meta = document.querySelector('meta[name="theme-color"]');
+            if (meta) meta.setAttribute('content', '#0f172a');
+        }
+        if (this.darkModeToggle) this.darkModeToggle.checked = this.settings.darkMode;
+        if (this.hapticToggle) this.hapticToggle.checked = this.settings.hapticFeedback;
+    if (this.bgMusicToggle) this.bgMusicToggle.checked = this.settings.backgroundMusic;
+    if (this.guidedVoiceToggle) this.guidedVoiceToggle.checked = this.settings.guidedVoice;
+    // Check for audio files availability
+        setTimeout(() => this.checkForAudioFiles(), 0);
+    }
+
+    // ===================
+    // Audio — File Definitions
+    // ===================
+    initAudio() {
+        this.audio.files = {
+            last_breath_now_hold: 'Audio/last-breathe_now-hold.mp3',
+            start_session: 'Audio/three_two_one.mp3',
+            recovery_breathe_in_hold: 'Audio/hold_for_10_seconds.mp3',
+            next_cycle: 'Audio/next-cycle.mp3',
+            start_hold: 'Audio/hold.mp3',
+            session_finished: 'Audio/session-finished.mp3'
+        };
+    }
+
+    // ===================
+    // Audio — Cue Player (Speech Primary)
+    // ===================
+    playCue(key) {
+        // Speech synthesis is primary — works without any audio files
+        if ('speechSynthesis' in window) {
+            this.speakFallback(key);
+            return true;
+        }
+        // Speech unavailable — try audio files as fallback
+        const src = this.audio.files[key];
+        if (!src) return false;
+        if (!this.audio.cues[key]) {
+            try {
+                const a = new Audio(src);
+                a.preload = 'auto';
+                a.volume = this.settings.soundVolume / 100;
+                this.audio.cues[key] = a;
+            } catch (e) {
+                return false;
+            }
+        }
+        const audio = this.audio.cues[key];
+        try {
+            audio.currentTime = 0;
+            audio.volume = this.settings.soundVolume / 100;
+            const p = audio.play();
+            if (p && typeof p.then === 'function') {
+                p.catch(() => {});
+            }
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    // ===================
+    // Audio — Background Music
+    // ===================
+    startBackgroundMusic() {
+        if (!this.settings.backgroundMusic || this.backgroundAudio) return;
+        const candidates = [
+            'Audio/ambient.mp3',
+            'Audio/ambient.ogg',
+            'Audio/music.mp3',
+            'Audio/music.ogg'
+        ];
+        const tryLoad = (index) => {
+            if (index >= candidates.length) return;
+            const audio = new Audio(candidates[index]);
+            audio.loop = true;
+            audio.volume = this.settings.soundVolume / 100 * 0.3;
+            audio.addEventListener('canplaythrough', () => {
+                this.backgroundAudio = audio;
+                audio.play().catch(() => {});
+            }, { once: true });
+            audio.addEventListener('error', () => tryLoad(index + 1), { once: true });
+            audio.load();
+        };
+        tryLoad(0);
+    }
+
+    stopBackgroundMusic() {
+        if (this.backgroundAudio) {
+            try {
+                this.backgroundAudio.pause();
+                this.backgroundAudio.currentTime = 0;
+            } catch (_) {}
+            this.backgroundAudio = null;
+        }
+    }
 }
 
 // Initialize the app when the DOM is loaded
@@ -1125,102 +1512,4 @@ document.addEventListener('DOMContentLoaded', () => {
     new BreathingApp();
 });
 
-// ===========================
-// Settings persistence helpers
-// ===========================
-BreathingApp.prototype.saveSettings = function() {
-    try {
-        localStorage.setItem('breathingAppSettings', JSON.stringify(this.settings));
-    } catch (e) {}
-};
 
-BreathingApp.prototype.loadSettings = function() {
-    try {
-        const saved = localStorage.getItem('breathingAppSettings');
-        if (saved) {
-            const parsed = JSON.parse(saved);
-            if (typeof parsed.speechVolume === 'number') this.settings.speechVolume = parsed.speechVolume;
-            if (typeof parsed.soundVolume === 'number') this.settings.soundVolume = parsed.soundVolume;
-            if (typeof parsed.darkMode === 'boolean') this.settings.darkMode = parsed.darkMode;
-            if (typeof parsed.hapticFeedback === 'boolean') this.settings.hapticFeedback = parsed.hapticFeedback;
-        }
-    } catch (e) {}
-    // Reflect settings in UI
-    if (this.speechVolume) {
-        this.speechVolume.value = this.settings.speechVolume;
-        this.speechVolumeValue.textContent = `${this.settings.speechVolume}%`;
-    }
-    if (this.soundVolume) {
-        this.soundVolume.value = this.settings.soundVolume;
-        this.soundVolumeValue.textContent = `${this.settings.soundVolume}%`;
-    }
-    // Apply dark mode on load
-    if (this.settings.darkMode) {
-        document.body.classList.add('dark-mode');
-        const meta = document.querySelector('meta[name="theme-color"]');
-        if (meta) meta.setAttribute('content', '#0f172a');
-    }
-    if (this.darkModeToggle) this.darkModeToggle.checked = this.settings.darkMode;
-    if (this.hapticToggle) this.hapticToggle.checked = this.settings.hapticFeedback;
-    // Show music setting
-    if (this.musicSettingGroup) {
-        this.musicSettingGroup.style.display = '';
-    }
-};
-
-// ==============
-// Audio helpers
-// ==============
-BreathingApp.prototype.initAudio = function() {
-    this.audio.files = {
-        last_breath_now_hold: 'Audio/last-breathe_now-hold.mp3',
-        start_session: 'Audio/three_two_one.mp3',
-        recovery_breathe_in_hold: 'Audio/hold_for_10_seconds.mp3',
-        next_cycle: 'Audio/next-cycle.mp3',
-        start_hold: 'Audio/hold.mp3',
-        session_finished: 'Audio/session-finished.mp3'
-    };
-};
-
-BreathingApp.prototype.playCue = function(key) {
-    const src = this.audio.files[key];
-    if (!src) return false;
-    if (!this.audio.cues[key]) {
-        try {
-            const a = new Audio(src);
-            a.preload = 'auto';
-            a.volume = this.settings.soundVolume / 100;
-            this.audio.cues[key] = a;
-        } catch (e) {
-            return false;
-        }
-    }
-    const audio = this.audio.cues[key];
-    try {
-        audio.currentTime = 0;
-        audio.volume = this.settings.soundVolume / 100;
-        const p = audio.play();
-        if (p && typeof p.then === 'function') {
-            p.catch(() => {
-                // Audio play failed - try speech fallback
-                this.speakFallback(key);
-            });
-        }
-        return true;
-    } catch (e) {
-        this.speakFallback(key);
-        return false;
-    }
-};
-
-// Speech fallback when audio files are missing
-BreathingApp.prototype.speakFallback = function(key) {
-    const messages = {
-        start_session: 'Three, two, one, begin',
-        last_breath_now_hold: 'Last breath, now hold',
-        recovery_breathe_in_hold: 'Breathe in and hold for ten seconds',
-        next_cycle: 'Next cycle',
-        session_finished: 'Session finished, well done'
-    };
-    if (messages[key]) this.speak(messages[key]);
-};

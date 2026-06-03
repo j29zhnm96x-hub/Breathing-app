@@ -58,6 +58,7 @@
                     aria-live="polite">
                     <span class="button-text" id="buttonText">Ready</span>
                 </button>
+                <div class="session-progress" id="sessionProgress"></div>
             </div>
 
             <!-- Controls -->
@@ -116,19 +117,40 @@
                         </label>
                     </div>
                     <div class="setting-group">
+                        <label class="toggle-label">
+                            <span>Guided Voice</span>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="guidedVoiceToggle">
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </label>
+                        <div class="music-helper-row">
+                            <span style="font-size:12px;color:var(--text-muted)">Voice guides your breath: "In... Out... Hold"</span>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <label class="toggle-label">
+                            <span>Background Music</span>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="bgMusicToggle">
+                                <span class="toggle-slider"></span>
+                            </div>
+                        </label>
+                        <div class="music-helper-row">
+                            <span id="musicHelper">Detecting audio files...</span>
+                            <button id="rescanAudioBtn" class="rescan-btn">Rescan
+                                Audio</button>
+                        </div>
+                    </div>
+                    <div class="setting-group">
                         <label for="speechVolume">Speech Volume</label>
                         <input type="range" id="speechVolume" min="0" max="100" value="70" class="slider">
                         <span class="volume-value" id="speechVolumeValue">70%</span>
                     </div>
-                    <div class="setting-group" id="musicSettingGroup">
+                    <div class="setting-group">
                         <label for="soundVolume">Sound Volume</label>
                         <input type="range" id="soundVolume" min="0" max="100" value="50" class="slider">
                         <span class="volume-value" id="soundVolumeValue">50%</span>
-                        <div class="music-helper-row">
-                            <span id="musicHelper">Controls volume for cues and background music.</span>
-                            <button id="rescanAudioBtn" class="rescan-btn">Rescan
-                                Audio</button>
-                        </div>
                     </div>
                     <button class="create-exercise-btn" id="createExerciseBtn">
                         <i data-lucide="plus"></i>
@@ -227,6 +249,23 @@
             </div>
         </div>
 
+        <!-- Generic Confirmation Modal -->
+        <div class="modal-overlay" id="genericConfirmModal" role="dialog" aria-modal="true"
+            aria-labelledby="genericConfirmTitle">
+            <div class="modal">
+                <div class="modal-header">
+                    <h2 id="genericConfirmTitle">Confirm</h2>
+                </div>
+                <div class="modal-content">
+                    <p class="modal-description" id="genericConfirmDesc">Are you sure?</p>
+                    <div class="modal-actions">
+                        <button class="confirm-cancel-btn" id="genericConfirmYes">Yes</button>
+                        <button class="keep-going-btn" id="genericConfirmNo">No</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Create Exercise Modal -->
         <div class="modal-overlay" id="createExerciseModal" role="dialog" aria-modal="true"
             aria-labelledby="createExerciseTitle">
@@ -261,7 +300,7 @@
         // Register Service Worker for offline support
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').catch(() => {});
+                navigator.serviceWorker.register('sw.js').catch((err) => console.warn('SW registration failed:', err));
             });
         }
     </script>

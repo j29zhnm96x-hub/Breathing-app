@@ -204,6 +204,40 @@ input, textarea, select {
     max-width: 400px;
     max-height: 400px;
     margin-bottom: 40px;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Outer glow ring — concentric circle behind the button */
+.breathing-button-container::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, transparent 70%);
+    transform: scale(1);
+    transition: transform 0.4s ease, opacity 0.4s ease;
+    pointer-events: none;
+}
+
+body.session-active .breathing-button-container::before {
+    animation: ringGlow 3s ease-in-out infinite;
+}
+
+body.session-active .breathing-button.pressed ~ .breathing-button-container::before,
+.breathing-button-container:has(.breathing-button.pressed)::before {
+    animation: none;
+    transform: scale(1.25);
+    opacity: 0.9;
+}
+
+body.session-active.paused .breathing-button-container::before {
+    animation: none;
+    opacity: 0.2;
+    transform: scale(0.9);
 }
 
 .breathing-button {
@@ -211,29 +245,34 @@ input, textarea, select {
     height: 100%;
     border: none;
     background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-    border-radius: 24px;
+    border-radius: 50%;
     color: white;
     font-size: 24px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: transform 0.25s ease, box-shadow 0.4s ease, background 0.3s ease;
     box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3);
     position: relative;
     overflow: hidden;
     /* Prevent double-tap zoom on mobile */
     touch-action: manipulation;
+    z-index: 2;
 }
 
 .breathing-button:hover {
-    transform: scale(1.02);
-    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.4);
+    box-shadow: 0 12px 40px rgba(139, 92, 246, 0.5);
 }
 
-.breathing-button:active,
+/* Inhale — pressed state: expand */
 .breathing-button.pressed {
-    transform: scale(0.98);
+    transform: scale(1.08);
     background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
-    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.6);
+    box-shadow: 0 0 50px rgba(139, 92, 246, 0.6), 0 0 100px rgba(139, 92, 246, 0.2);
+}
+
+/* Exhale — resting state during session: slight contract */
+body.session-active .breathing-button:not(.pressed) {
+    transform: scale(0.95);
 }
 
 .breathing-button::before {
@@ -243,8 +282,8 @@ input, textarea, select {
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, transparent 100%);
-    border-radius: 24px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+    border-radius: 50%;
     transition: opacity 0.3s ease;
 }
 
@@ -255,13 +294,20 @@ input, textarea, select {
 .button-text {
     position: relative;
     z-index: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.2;
 }
 
-/* Paused State Visual Cue */
-body.session-active.paused .breathing-button {
-    filter: grayscale(40%) brightness(0.9);
-    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
+.breath-count {
+    font-size: 14px;
+    font-weight: 400;
+    opacity: 0.75;
+    margin-top: 2px;
 }
+
+/* Paused state text indicator */
 body.session-active.paused .button-text::after {
     content: ' (Paused)';
     font-size: 14px;
@@ -689,7 +735,6 @@ body.session-active.paused .button-text::after {
     
     .breathing-button {
         font-size: 20px;
-        border-radius: 20px;
     }
     
     .cycle-row {
@@ -919,29 +964,46 @@ body.session-active.paused .button-text::after {
     color: white;
 }
 
-/* Breathing Animation Pulse */
-@keyframes breathPulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3); }
-    50% { transform: scale(1.03); box-shadow: 0 12px 40px rgba(139, 92, 246, 0.5); }
+/* Breathing Animation — exhale pulse (resting between breaths) */
+@keyframes exhalePulse {
+    0%, 100% { transform: scale(0.95); box-shadow: 0 8px 32px rgba(139, 92, 246, 0.3); }
+    50% { transform: scale(0.92); box-shadow: 0 4px 20px rgba(139, 92, 246, 0.2); }
 }
 
 body.session-active .breathing-button:not(.pressed) {
-    animation: breathPulse 2s ease-in-out infinite;
+    animation: exhalePulse 2.5s ease-in-out infinite;
 }
 
+/* Paused State Visual Cue */
 body.session-active.paused .breathing-button {
     animation: none;
+    transform: scale(0.92);
+    filter: grayscale(40%) brightness(0.9);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.2);
 }
 
-/* Session progress indicator */
+/* Outer glow ring animation for breathing phase */
+@keyframes ringGlow {
+    0%, 100% { transform: scale(1); opacity: 0.5; }
+    50% { transform: scale(1.12); opacity: 0.8; }
+}
+
+/* Session progress indicator — circular ring overlay */
 .session-progress {
     position: absolute;
-    bottom: 0;
-    left: 0;
-    height: 4px;
-    background: var(--accent);
-    border-radius: 0 0 24px 24px;
-    transition: width 0.3s ease;
+    inset: -5px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    /* Cut out center to make a ring */
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
+    mask: radial-gradient(farthest-side, transparent calc(100% - 8px), #000 calc(100% - 8px));
+}
+
+.session-progress.visible {
+    opacity: 1;
 }
 
 /* Dark mode overrides for inline styles in modals */
